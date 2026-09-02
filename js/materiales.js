@@ -15,9 +15,28 @@ var texParquet   = textura('Textures/Parquet.png', 14, 16);
 var texAlfombra  = textura('Textures/RedCarpet.png', 1, 1); // el largo se controla en el propio UV de la alfombra
 var texTelon     = textura('Textures/Telon.png', 1, 1);     // ídem: el UV de la cortina ya mete su propio repetido
 
+/* Varios materiales "gemelos" por textura (misma imagen, cada uno con su
+   propia rotación/desplazamiento de UV y un tono ligeramente distinto),
+   para que butacas vecinas no se vean todas exactamente iguales. */
+function variantesMaterial(ruta, n, rotMax, tonoMin, tonoMax){
+  var mats=[], i;
+  for(i=0;i<n;i++){
+    var t=cargador.load(ruta);
+    t.wrapS=t.wrapT=THREE.RepeatWrapping;
+    t.center.set(0.5,0.5);
+    t.rotation=(Math.random()*2-1)*rotMax;
+    t.offset.set(Math.random(), Math.random());
+    var tono=tonoMin+Math.random()*(tonoMax-tonoMin);
+    mats.push(new THREE.MeshLambertMaterial({map:t, color:new THREE.Color(tono,tono,tono)}));
+  }
+  return mats;
+}
+var matTercButaca   = variantesMaterial('Textures/TerciopeloButaca.png', 6, 0.20, 0.88, 1.10);
+var matMaderaButaca = variantesMaterial('Textures/MaderaButaca.png',     6, 0.15, 0.90, 1.08);
+
 var MAT = {
-  terciopelo: new THREE.MeshLambertMaterial({color:0x711c1c}),
-  madera:     new THREE.MeshLambertMaterial({color:0x2e1c14}),
+  terciopeloButaca: matTercButaca, // array: una por variante, ver geometria.js
+  maderaButaca:     matMaderaButaca,
   suelo:      new THREE.MeshLambertMaterial({color:0x3a2118, side:THREE.DoubleSide}),
   parquet:    new THREE.MeshLambertMaterial({map:texParquet, side:THREE.DoubleSide}),
   alfombra:   new THREE.MeshLambertMaterial({map:texAlfombra, side:THREE.DoubleSide}),
@@ -31,7 +50,11 @@ var MAT = {
 };
 
 var lista=[];
-for(var k in MAT) lista.push(MAT[k]);
+for(var k in MAT){
+  var v=MAT[k];
+  if(Array.isArray(v)) v.forEach(function(m){ lista.push(m); });
+  else lista.push(v);
+}
 
 /* Materiales creados dinámicamente (texturas de canvas, etc.) se registran
    aquí para que el toggle de "modo boceto" también los ponga en wireframe. */

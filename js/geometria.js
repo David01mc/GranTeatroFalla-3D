@@ -101,12 +101,19 @@ var LATERAL_DENTRO = CENTRO_MEDIO + PASILLO_CENTRAL;             // borde interi
 
 function zFila(i){ return Z_FILA1 + i*FILA_PASO; }
 
+/* Cada butaca se apunta a una "variante" de tapizado/madera al azar
+   (ver variantesMaterial() en materiales.js): así, aunque compartan la
+   misma geometría, no todas lucen exactamente el mismo tono ni la
+   misma orientación de veta/textura. */
+var N_VARIANTES_BUTACA = MAT.terciopeloButaca.length;
+function variante(){ return Math.floor(Math.random()*N_VARIANTES_BUTACA); }
+
 /* Los 9x16 asientos del bloque central. */
 function sitiosCentro(){
   var out=[];
   for(var i=0;i<FILAS_CENTRO;i++){
     var z=zFila(i);
-    for(var c=0;c<ASIENTOS_CENTRO;c++) out.push({x:(c-(ASIENTOS_CENTRO-1)/2)*ASIENTO_PASO, z:z});
+    for(var c=0;c<ASIENTOS_CENTRO;c++) out.push({x:(c-(ASIENTOS_CENTRO-1)/2)*ASIENTO_PASO, z:z, v:variante()});
   }
   return out;
 }
@@ -123,7 +130,7 @@ function sitiosLateral(signo){
       // salvaguarda: si esta butaca dejase menos del pasillo lateral mínimo
       // hasta el muro real, se omite en vez de solaparse con la pared.
       if(geo.distAPlanta(x,z) < PASILLO_LATERAL) continue;
-      out.push({x:x, z:z});
+      out.push({x:x, z:z, v:variante()});
     }
   }
   return out;
@@ -158,32 +165,111 @@ function pasillosPatio(){
   return g;
 }
 
+/* Perfil del respaldo: recto por los lados y por abajo, redondeado
+   por arriba (como el de la foto de referencia). */
+function perfilRespaldo(ancho, alto, radio){
+  var hw=ancho/2, r=Math.min(radio, hw, alto*0.85), s=new THREE.Shape();
+  s.moveTo(-hw, 0);
+  s.lineTo(-hw, alto-r);
+  s.quadraticCurveTo(-hw, alto, -hw+r, alto);
+  s.lineTo(hw-r, alto);
+  s.quadraticCurveTo(hw, alto, hw, alto-r);
+  s.lineTo(hw, 0);
+  s.lineTo(-hw, 0);
+  return s;
+}
+
+/* Perfil (visto de lado) del panel de madera del brazo: junto al
+   respaldo sube recto y remata en una esquina redondeada (apenas un
+   poco por encima del cojín, no un poste marcado), y baja curvándose
+   hacia el escenario en una voluta, como en las butacas de teatro
+   clásicas. */
+function perfilBrazo(atras, delante, altoAtras, altoDelante){
+  var r=0.05, s=new THREE.Shape();
+  s.moveTo(-atras, 0);
+  s.lineTo(-atras, altoAtras-r);
+  s.quadraticCurveTo(-atras, altoAtras, -atras+r, altoAtras);
+  s.quadraticCurveTo(-atras*0.15, altoAtras, delante*0.35, altoAtras*0.86);
+  s.quadraticCurveTo(delante*0.85, altoAtras*0.5, delante, altoDelante);
+  s.lineTo(delante, 0);
+  s.lineTo(-atras, 0);
+  return s;
+}
+
+var ALTO_BRAZO = 0.54; // un poco por encima del cojín (que llega a 0.52)
+
+/* El panel de brazo se dibuja en un plano alto/profundidad y se gira
+   90º para que el grosor quede en el eje x (izquierda/derecha) y el
+   perfil en z/y (profundidad/altura), tal como se ve desde el pasillo. */
+function geometriaBrazo(grosor){
+  var g=new THREE.ExtrudeGeometry(perfilBrazo(0.20,0.30,ALTO_BRAZO,0.12),
+    {depth:grosor, bevelEnabled:false, curveSegments:10});
+  g.translate(0,0,-grosor/2);
+  g.rotateY(Math.PI/2);
+  return g;
+}
+
 function butacas(){
   var sitios = sitiosCentro().concat(sitiosLateral(-1), sitiosLateral(1));
   nButacas = sitios.length;
   nFilas = FILAS_CENTRO;
 
-  var piezas = [
-    {g:new THREE.BoxGeometry(0.46,0.52,0.09), t:[0,0.76,0.20], m:MAT.terciopelo},
-    {g:new THREE.BoxGeometry(0.46,0.10,0.42), t:[0,0.47,0.00], m:MAT.terciopelo},
-    {g:new THREE.BoxGeometry(0.58,0.06,0.40), t:[0,0.55,0.00], m:MAT.madera},
-    {g:new THREE.BoxGeometry(0.13,0.44,0.13), t:[0,0.23,0.02], m:MAT.madera}
-  ];
+  var GROSOR_BRAZO=0.07, X_BRAZO=ASIENTO_PASO/2-0.035; // deja un pequeño hueco entre butacas vecinas
+  var yFilete=ALTO_BRAZO+0.005;
+
+  // Geometrías, ya con su translate aplicado: se reutilizan tal cual
+  // para cada variante (solo cambia el material, no la forma).
+  var geoRespaldo=new THREE.ExtrudeGeometry(perfilRespaldo(0.46,0.56,0.19),
+    {depth:0.10, bevelEnabled:false, curveSegments:10});
+  geoRespaldo.translate(0,0.50,0.15);
+  // Concha de madera del respaldo: el mismo perfil, más ancho/alto y
+  // más grueso, colocada justo detrás del cojín tapizado, para que
+  // asome como un marco de madera alrededor y por detrás de la tela
+  // (tal como en las butacas reales del Falla, vistas desde el pasillo).
+  var geoRespaldoMadera=new THREE.ExtrudeGeometry(perfilRespaldo(0.56,0.64,0.22),
+    {depth:0.07, bevelEnabled:false, curveSegments:10});
+  geoRespaldoMadera.translate(0,0.46,0.24);
+  var geoCojin=new THREE.BoxGeometry(0.46,0.10,0.42); geoCojin.translate(0,0.47,0.00);
+  var geoBase=new THREE.BoxGeometry(0.50,0.06,0.40); geoBase.translate(0,0.38,0.00);
+  var geoBrazoI=geometriaBrazo(GROSOR_BRAZO); geoBrazoI.translate(-X_BRAZO,0,0);
+  var geoBrazoD=geometriaBrazo(GROSOR_BRAZO); geoBrazoD.translate(X_BRAZO,0,0);
+  var geoFileteI=new THREE.BoxGeometry(GROSOR_BRAZO+0.015,0.025,0.14); geoFileteI.translate(-X_BRAZO,yFilete,0.16);
+  var geoFileteD=new THREE.BoxGeometry(GROSOR_BRAZO+0.015,0.025,0.14); geoFileteD.translate(X_BRAZO,yFilete,0.16);
+
   var grupo=new THREE.Group(), m4=new THREE.Matrix4(), q=new THREE.Quaternion(),
       pos3=new THREE.Vector3(), esc=new THREE.Vector3(1,1,1);
 
-  piezas.forEach(function(p){
-    p.g.translate(p.t[0],p.t[1],p.t[2]);
-    var im=new THREE.InstancedMesh(p.g, p.m, sitios.length);
-    for(var i=0;i<sitios.length;i++){
-      var s=sitios[i];
+  function instanciar(geometria, material, lista){
+    if(!lista.length) return;
+    var im=new THREE.InstancedMesh(geometria, material, lista.length);
+    for(var i=0;i<lista.length;i++){
+      var s=lista[i];
       pos3.set(s.x, geo.rake(s.z), s.z);
       m4.compose(pos3,q,esc); // q = identidad: todas las butacas miran hacia el escenario
       im.setMatrixAt(i,m4);
     }
     im.instanceMatrix.needsUpdate=true;
     grupo.add(im);
+  }
+
+  // El filete dorado no varía; el resto sí, agrupando cada butaca según
+  // la variante de tapizado/madera que le tocó en sitiosCentro/Lateral().
+  instanciar(geoFileteI, MAT.oro, sitios);
+  instanciar(geoFileteD, MAT.oro, sitios);
+
+  var porVariante=[], v;
+  for(v=0;v<N_VARIANTES_BUTACA;v++) porVariante.push([]);
+  sitios.forEach(function(s){ porVariante[s.v].push(s); });
+
+  porVariante.forEach(function(lista, v){
+    instanciar(geoRespaldoMadera, MAT.maderaButaca[v], lista);
+    instanciar(geoRespaldo, MAT.terciopeloButaca[v], lista);
+    instanciar(geoCojin,    MAT.terciopeloButaca[v], lista);
+    instanciar(geoBase,     MAT.maderaButaca[v], lista);
+    instanciar(geoBrazoI,   MAT.maderaButaca[v], lista);
+    instanciar(geoBrazoD,   MAT.maderaButaca[v], lista);
   });
+
   return grupo;
 }
 
