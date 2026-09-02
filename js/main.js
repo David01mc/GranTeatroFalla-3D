@@ -5,12 +5,12 @@ var FALLA = window.FALLA;
 var escena, camara, render, reloj;
 
 function iniciar(){
-  render=new THREE.WebGLRenderer({antialias:true});
+  render=new THREE.WebGLRenderer({antialias:true, logarithmicDepthBuffer:true});
   render.setPixelRatio(Math.min(devicePixelRatio,2));
   render.setSize(innerWidth, innerHeight);
   document.body.appendChild(render.domElement);
 
-  camara=new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.1, 300);
+  camara=new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.1, 100);
   escena=new THREE.Scene();
   var stats=FALLA.escena.construir(escena);
 

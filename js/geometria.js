@@ -46,7 +46,7 @@ function alfombra(pts, ancho, mat){
     var p=pts[i], a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)];
     var tx=b.x-a.x, tz=b.z-a.z, L=Math.hypot(tx,tz)||1; tx/=L; tz/=L;
     var nx=-tz, nz=tx;
-    var y = geo.rake(p.z)+0.04; // ligeramente por encima del suelo, evita z-fighting a distancia
+    var y = geo.rake(p.z)+0.06; // ligeramente por encima del suelo, evita z-fighting a distancia
     pos.push(p.x-nx*ancho/2, y, p.z-nz*ancho/2,  p.x+nx*ancho/2, y, p.z+nz*ancho/2);
     if(i>0) dist += Math.hypot(p.x-pts[i-1].x, p.z-pts[i-1].z);
     uv.push(0, dist*0.6,  1, dist*0.6);
@@ -153,14 +153,23 @@ function enBloqueAsientos(x,z){
 geo.enBloqueAsientos = enBloqueAsientos;
 
 /* Las alfombras solo cubren los dos pasillos centrales (los que más se
-   recorren); los laterales, junto a los muros, se quedan en parquet. */
+   recorren); los laterales, junto a los muros, se quedan en parquet.
+   La alfombra se pinta algo más estrecha que el propio pasillo — deja
+   un pequeño margen de parquet a cada lado, como una alfombra de
+   pasillo real que no llega de canto a canto — para que el borde del
+   brazo de la butaca (que toca justo el límite del pasillo) no quede
+   pegado al borde de la alfombra: el brazo mide 0.54 m de alto, y visto
+   desde muy arriba y algo lejos la perspectiva puede desplazar su parte
+   alta bastante más de lo que separaría un margen pequeño, así que el
+   hueco tiene que ser generoso, no solo simbólico. */
 function pasillosPatio(){
   var g=new THREE.Group();
   var zIni=Z_FILA1-0.6, zFin=zFila(FILAS_CENTRO-1)+0.6;
   var cx = (CENTRO_MEDIO+LATERAL_DENTRO)/2;
+  var anchoAlfombra = PASILLO_CENTRAL - 0.36;
   [-1,1].forEach(function(signo){
     var pts=[{x:signo*cx, z:zIni}, {x:signo*cx, z:zFin}];
-    g.add(alfombra(pts, PASILLO_CENTRAL, MAT.alfombra));
+    g.add(alfombra(pts, anchoAlfombra, MAT.alfombra));
   });
   return g;
 }
