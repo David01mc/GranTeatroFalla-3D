@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Gran Teatro Falla — la sala</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --tinta:#14090a;
+    --almagre:#6e1414;
+    --oro:#c9922f;
+    --marfil:#e8dcc6;
+    --humo:rgba(232,220,198,.55);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--tinta)}
+  body{
+    font-family:"Bodoni Moda",Didot,"Bodoni MT",Georgia,serif;
+    color:var(--marfil);
+    -webkit-font-smoothing:antialiased;
+    touch-action:none;
+  }
+  canvas{display:block;position:fixed;inset:0}
+
+  .rotulo{
+    position:fixed;top:20px;left:22px;z-index:5;
+    max-width:min(46vw,320px);pointer-events:none;
+  }
+  .rotulo h1{
+    font-size:clamp(19px,2.4vw,27px);font-weight:400;letter-spacing:.01em;line-height:1.15;
+  }
+  .rotulo p{
+    margin-top:6px;font-size:12.5px;line-height:1.5;color:var(--humo);
+    font-variant-numeric:tabular-nums;
+  }
+
+  .barra{
+    position:fixed;left:0;right:0;bottom:0;z-index:5;
+    padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+    display:flex;gap:8px;align-items:center;
+    overflow-x:auto;scrollbar-width:none;
+    background:linear-gradient(to top,rgba(10,5,5,.85),rgba(10,5,5,0));
+  }
+  .barra::-webkit-scrollbar{display:none}
+  button{
+    flex:0 0 auto;font:inherit;font-size:14px;color:var(--marfil);
+    background:rgba(24,12,12,.66);
+    border:1px solid rgba(201,146,47,.32);
+    padding:8px 15px 9px;border-radius:2px;cursor:pointer;
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    transition:background .18s,border-color .18s;
+  }
+  button:hover{background:rgba(110,20,20,.6)}
+  button:focus-visible{outline:2px solid var(--oro);outline-offset:2px}
+  button[aria-pressed="true"]{
+    background:var(--almagre);border-color:var(--oro);
+  }
+  button:disabled{opacity:.35;cursor:not-allowed}
+  .sep{flex:0 0 auto;width:1px;height:26px;background:rgba(201,146,47,.28);margin:0 4px}
+
+  #carga{
+    position:fixed;inset:0;z-index:20;display:grid;place-items:center;
+    background:var(--tinta);color:var(--humo);font-size:14px;letter-spacing:.06em;
+    transition:opacity .6s ease;
+  }
+  @media (prefers-reduced-motion:reduce){#carga{transition:none}}
+  @media (max-width:560px){
+    .rotulo{top:14px;left:16px;max-width:66vw}
+    .rotulo p{font-size:11.5px}
+  }
+</style>
+</head>
+<body>
+
+<div class="rotulo">
+  <h1>La sala del Falla</h1>
+  <p id="datos">Levantando la herradura…</p>
+</div>
+
+<nav class="barra" id="barra" aria-label="Puntos de vista">
+  <button data-vista="butaca">Fila 8</button>
+  <button data-vista="escenario">Desde las tablas</button>
+  <button data-vista="palco">Palco principal</button>
+  <button data-vista="paraiso">Paraíso</button>
+  <button data-vista="planta">Planta</button>
+  <span class="sep"></span>
+  <button id="telon" aria-pressed="false">Cerrar telón</button>
+  <button id="paseo" aria-pressed="false" title="WASD para moverte, ratón para mirar, espacio para saltar, Esc para salir">Modo paseo</button>
+  <button id="boceto" aria-pressed="false">Modo boceto</button>
+</nav>
+
+<div id="carga">construyendo la sala</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js/parametros.js"></script>
+<script src="js/materiales.js"></script>
+<script src="js/geometria.js"></script>
+<script src="js/camara-orbit.js"></script>
+<script src="js/paseo.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
