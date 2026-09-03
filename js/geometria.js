@@ -5,17 +5,20 @@ var geo = FALLA.geo, P = geo.P, MAT = FALLA.materiales.MAT, registrar = FALLA.ma
 
 /* Cinta vertical siguiendo una polilínea. */
 function cinta(pts, yb, yt, mat){
-  var g=new THREE.BufferGeometry(), pos=[], idx=[], i;
+  var g=new THREE.BufferGeometry(), pos=[], uv=[], idx=[], i, dist=0;
   for(i=0;i<pts.length;i++){
     var p=pts[i];
+    if(i>0) dist+=Math.hypot(p.x-pts[i-1].x,p.z-pts[i-1].z);
     var b=(typeof yb==='function')?yb(p):yb, t=(typeof yt==='function')?yt(p):yt;
     pos.push(p.x,b,p.z, p.x,t,p.z);
+    uv.push(dist*0.5,0, dist*0.5,1);
   }
   for(i=0;i<pts.length-1;i++){
     var a=i*2;
     idx.push(a,a+1,a+2, a+1,a+3,a+2);
   }
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv,2));
   g.setIndex(idx); g.computeVertexNormals();
   return new THREE.Mesh(g,mat);
 }
@@ -540,14 +543,39 @@ function indicesPorLongitud(plan, ini, fin, n){
   return out;
 }
 
-/* Un solo poste de yeso, en el índice "i" de "borde"/"plan" (comparten
-   índice punto a punto). yBase da la altura del suelo del palco ahí. */
+/* Separador bajo entre dos palcos. Su perfil reproduce las piezas de la
+   sala real: es recto y bajo junto a las butacas y, ya cerca del fondo,
+   sube con una curva suave. No llega al techo ni cierra visualmente el
+   palco como lo hacía el tabique anterior. */
 function posteYesoEnIndice(escena, borde, plan, i, yBase, alto){
   var p=borde[i], q=plan[i];
   var y0=(typeof yBase==='function')?yBase(p):yBase;
-  var div=new THREE.Mesh(new THREE.BoxGeometry(0.16, alto+1.5, 1.5), MAT.yeso);
-  div.position.set((p.x*0.75+q.x*0.25), y0+(alto+1.5)/2, (p.z*0.75+q.z*0.25));
-  div.rotation.y=Math.atan2(q.x-p.x, q.z-p.z);
+  var dx=q.x-p.x, dz=q.z-p.z, distancia=Math.hypot(dx,dz)||1;
+  var ux=dx/distancia, uz=dz/distancia, margenFrontal=0.10;
+  var fondo=Math.min(1.35, distancia*0.55), grosor=0.12;
+  var hBajo=Math.max(0.68, alto*0.62), hFondo=Math.max(1.08, alto*1.02);
+
+  // Tramo superior horizontal seguido de una única onda ascendente hacia
+  // el muro, como los biombos de la fotografía de referencia.
+  var perfil=new THREE.Shape();
+  perfil.moveTo(0,0);
+  perfil.lineTo(fondo,0);
+  perfil.lineTo(fondo,hFondo);
+  perfil.bezierCurveTo(fondo*0.84,hFondo, fondo*0.76,hBajo, fondo*0.58,hBajo);
+  perfil.lineTo(0,hBajo);
+  perfil.lineTo(0,0);
+
+  var geometriaDiv=new THREE.ExtrudeGeometry(perfil,{
+    depth:grosor, bevelEnabled:true, bevelThickness:0.025,
+    bevelSize:0.025, bevelSegments:2
+  });
+  geometriaDiv.translate(0,0,-grosor/2);
+  var div=new THREE.Mesh(geometriaDiv, MAT.maderaBlanca);
+  // Se retranquea también el bisel: ninguna parte sobresale por delante
+  // de la barandilla ni alcanza el borde exterior del suelo del palco.
+  div.position.set(p.x+ux*margenFrontal, y0, p.z+uz*margenFrontal);
+  // El eje X local del perfil apunta desde la barandilla hacia el muro.
+  div.rotation.y=-Math.atan2(dz,dx);
   escena.add(div);
 }
 
@@ -572,7 +600,7 @@ function separadoresPalco(escena, borde, plan, ini, fin, n, yBase, alto){
    el anillo (también el tramo central sin tabicar). */
 function barandillaPalco(escena, borde, yBase, alto){
   escena.add(cinta(borde, yBase, function(p){return yBase(p)+0.12;}, MAT.antepecho));       // zócalo
-  escena.add(cinta(borde, function(p){return yBase(p)+alto-0.06;}, function(p){return yBase(p)+alto;}, MAT.oro)); // pasamanos
+  escena.add(cinta(borde, function(p){return yBase(p)+alto-0.025;}, function(p){return yBase(p)+alto;}, MAT.terciopelo2)); // pasamanos fino tapizado
   for(var i=0;i<borde.length;i++){
     var p=borde[i], y0=yBase(p);
     var bal=new THREE.Mesh(new THREE.BoxGeometry(0.05, alto-0.16, 0.05), MAT.oro);
@@ -656,14 +684,19 @@ function construir(escena){
   //    normal, empezando ya pasado el Antepalco.
   var ALTURA_FRONTAL = geo.escenario.altura + 0.10; // suelo del palco junto al escenario: un poco por encima de las tablas
   var ELEVACION_PLATEA = 0.40;                      // peana normal del resto del ala
+  var ALTURA_BARANDILLA_PLATEA = Math.max(0.68, P.pisos[0].alto*0.62); // coincide con el tramo recto de los separadores
+  // La platea inferior es horizontal: se toma como cota única el punto
+  // más alto que antes alcanzaba al seguir la pendiente de la sala. Así
+  // se elevan los tramos delanteros sin bajar los del fondo.
+  var ALTURA_PLATEA = geo.rake(P.zc+P.Rz)+ELEVACION_PLATEA;
   var sillaPalcoGeo = null;   // se construye una sola vez, la primera vez que hace falta
   P.pisos.forEach(function(piso, n){
     var borde = geo.dentro(geo.PLAN, piso.dentro);
     // yPiso/yTop siempre como función de p, aunque en los pisos altos sea
     // un valor constante: así la moldura de abajo no necesita distinguir
     // el caso de la platea (suelo en pendiente) del resto (suelo plano).
-    var yPiso = (n===0) ? function(p){return geo.rake(p.z)+ELEVACION_PLATEA;} : function(){return piso.y;};
-    var yTop  = (n===0) ? function(p){return geo.rake(p.z)+ELEVACION_PLATEA+piso.alto;} : function(){return piso.y+piso.alto;};
+    var yPiso = (n===0) ? function(){return ALTURA_PLATEA;} : function(){return piso.y;};
+    var yTop  = (n===0) ? function(){return ALTURA_PLATEA+piso.alto;} : function(){return piso.y+piso.alto;};
 
     if(n===0){
       // El ala de la platea arranca donde termina el pasillo transversal
@@ -697,10 +730,10 @@ function construir(escena){
         var bF=[{x:xFrente,z:0},{x:xFrente,z:zMed},{x:xFrente,z:Z_CORREDOR_INI}];
         var plF=[{x:xFondo,z:0},{x:xFondo,z:zMed},{x:xFondo,z:Z_CORREDOR_INI}];
         escena.add(cinta(bF, function(p){return geo.rake(p.z);}, yFrontal, MAT.maderaButaca)); // peana
-        barandillaPalco(escena, bF, yFrontal, piso.alto);
+        barandillaPalco(escena, bF, yFrontal, ALTURA_BARANDILLA_PLATEA);
         escena.add(banda(bF, plF, function(){return ALTURA_FRONTAL+piso.alto;}, function(){return ALTURA_FRONTAL+piso.alto;}, MAT.hueco));
         escena.add(banda(bF, plF, yFrontal, yFrontal, MAT.suelo));
-        escena.add(cinta(bF, function(){return ALTURA_FRONTAL+piso.alto;}, function(){return ALTURA_FRONTAL+piso.alto+0.14;}, MAT.oro));
+        escena.add(cinta(bF, function(){return ALTURA_FRONTAL+ALTURA_BARANDILLA_PLATEA;}, function(){return ALTURA_FRONTAL+ALTURA_BARANDILLA_PLATEA+0.035;}, MAT.terciopelo2));
         sillasPalco(escena, bF, plF, 0, 2, 1, yFrontal, sillaPalcoGeo);
         // Tabique que cierra el Frontal hacia el pasillo transversal.
         var cierre=new THREE.Mesh(new THREE.BoxGeometry(ANCHO_FRONTAL, piso.alto+1.5, 0.16), MAT.yeso);
@@ -713,16 +746,20 @@ function construir(escena){
       // corte a iAla especular — así el Antepalco (de iArco a iAla) y el
       // hueco central (de corteD a corteI) quedan sin construir.
       var bAla=borde.slice(iAlaD,iAlaI+1), plAla=geo.PLAN.slice(iAlaD,iAlaI+1);
-      escena.add(cinta(bAla, function(p){return geo.rake(p.z);}, yPiso, MAT.maderaButaca)); // peana
-      barandillaPalco(escena, bAla, yPiso, piso.alto);
+      // Muro portante continuo bajo el frente de la platea: cierra el
+      // desnivel entre el suelo inclinado del patio y la cota horizontal
+      // de los palcos, evitando que estos parezcan suspendidos.
+      escena.add(cinta(bAla, function(p){return geo.rake(p.z);}, yPiso, MAT.maderaPlatea));
+      barandillaPalco(escena, bAla, yPiso, ALTURA_BARANDILLA_PLATEA);
       // Trasdós: misma forma que la herradura pero más retranqueado (más
       // cerca del muro real), para que el ala tenga volumen real y no
       // sea una peana de espesor cero. De momento sin textura.
       var trasdos = geo.dentro(geo.PLAN, piso.dentro*0.35).slice(iAlaD,iAlaI+1);
-      escena.add(cinta(trasdos, function(p){return geo.rake(p.z);}, yPiso, MAT.maderaButaca));
-      escena.add(banda(bAla, plAla, yTop, yTop, MAT.hueco));
+      escena.add(cinta(trasdos, function(p){return geo.rake(p.z);}, yPiso, MAT.maderaPlatea));
+      escena.add(cinta([bAla[0],trasdos[0]], function(p){return geo.rake(p.z);}, yPiso, MAT.maderaPlatea));
+      escena.add(cinta([bAla[bAla.length-1],trasdos[trasdos.length-1]], function(p){return geo.rake(p.z);}, yPiso, MAT.maderaPlatea));
       escena.add(banda(bAla, plAla, yPiso, yPiso, MAT.suelo));
-      escena.add(cinta(bAla, yTop, function(p){return yTop(p)+0.14;}, MAT.oro));
+      escena.add(cinta(bAla, function(){return ALTURA_PLATEA+ALTURA_BARANDILLA_PLATEA;}, function(){return ALTURA_PLATEA+ALTURA_BARANDILLA_PLATEA+0.035;}, MAT.terciopelo2));
 
       separadoresPalco(escena, borde, geo.PLAN, iAlaD, corteD, piso.palcosLado, yPiso, piso.alto);
       separadoresPalco(escena, borde, geo.PLAN, corteI, iAlaI, piso.palcosLado, yPiso, piso.alto);

@@ -15,7 +15,7 @@ var P = {
   Rx: 14.318,        // semieje de la elipse en anchura (algo mayor que jamba: la sala se abre poco a poco)
   Rz: 19.6,          // semieje de la elipse en profundidad
   tmax: 120*Math.PI/180,
-  rake: 0.045,       // pendiente del patio
+  rake: 0.030,       // pendiente del patio (3 cm por metro, aprox. 1.7 grados)
   zRake: 2.0,
   altura: 13.4,      // hasta el techo de Abárzuza
   pisos: [           // y del piso, y del antepecho, retranqueo, nº de palcos
