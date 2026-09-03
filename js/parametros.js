@@ -10,15 +10,16 @@ window.FALLA = window.FALLA || {};
    Cambiando estas cifras cambia el edificio entero.
 -------------------------------------------------------------------*/
 var P = {
-  jamba: 10.6,       // media anchura de la sala en la embocadura
-  zc: 12.0,          // centro del arco de la herradura (profundidad)
-  R: 13.4,           // radio de la herradura
-  tmax: 148*Math.PI/180,
+  jamba: 12.4,       // media anchura de la sala en la embocadura (y de toda la planta en z=0)
+  zc: 9.8,            // centro de la elipse de la herradura (profundidad)
+  Rx: 14.318,        // semieje de la elipse en anchura (algo mayor que jamba: la sala se abre poco a poco)
+  Rz: 19.6,          // semieje de la elipse en profundidad
+  tmax: 120*Math.PI/180,
   rake: 0.045,       // pendiente del patio
   zRake: 2.0,
   altura: 13.4,      // hasta el techo de Abárzuza
   pisos: [           // y del piso, y del antepecho, retranqueo, nº de palcos
-    {y:0.00, alto:1.15, dentro:1.60, palcos:0, palcosLado:9, nombre:'platea'},
+    {y:0.00, alto:1.15, dentro:2.90, palcos:0, palcosLado:9, nombre:'platea'},
     {y:3.60, alto:1.15, dentro:2.10, palcos:22, nombre:'principal'},
     {y:6.70, alto:1.10, dentro:2.70, palcos:20, nombre:'segundo'},
     {y:9.60, alto:1.05, dentro:3.30, palcos:0,  nombre:'paraíso'}
@@ -28,13 +29,16 @@ var P = {
 
 function rake(z){ return P.rake * Math.max(0, z - P.zRake); }
 
-/* Planta de la sala: abierta por la embocadura, cerrada por detrás. */
+/* Planta de la sala: una única elipse (Rx, Rz, centrada en zc), sin
+   tramo recto de jamba aparte — Rx y tmax están elegidos para que la
+   elipse arranque y termine exactamente en (±jamba, 0), la embocadura.
+   Así la pared no da un salto brusco de anchura nada más pasar el arco
+   de boca (como pasaba con la circunferencia + tramo recto anterior):
+   crece poco a poco, casi en paralelo al eje de la sala al principio,
+   y solo se abre del todo ya bien entrada la curva. */
 function planta(){
-  var pts=[], i, s, t;
-  var p0={x:P.R*Math.sin(P.tmax), z:P.zc+P.R*Math.cos(P.tmax)};
-  for(i=0;i<8;i++){ s=i/8; pts.push({x:P.jamba+(p0.x-P.jamba)*s, z:p0.z*s}); }
-  for(i=0;i<=72;i++){ t=P.tmax-2*P.tmax*i/72; pts.push({x:P.R*Math.sin(t), z:P.zc+P.R*Math.cos(t)}); }
-  for(i=1;i<=8;i++){ s=i/8; pts.push({x:-p0.x+(-P.jamba+p0.x)*s, z:p0.z*(1-s)}); }
+  var pts=[], i, t;
+  for(i=0;i<=72;i++){ t=P.tmax-2*P.tmax*i/72; pts.push({x:P.Rx*Math.sin(t), z:P.zc+P.Rz*Math.cos(t)}); }
   return pts;
 }
 var PLAN = planta();

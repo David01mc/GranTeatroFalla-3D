@@ -23,7 +23,7 @@ function iniciar(){
 
   document.getElementById('datos').textContent =
     stats.nButacas + ' butacas en ' + stats.nFilas + ' filas · planta en herradura de ' +
-    (FALLA.geo.P.R*2).toFixed(1) + ' m · generado por código, sin malla importada';
+    (FALLA.geo.P.Rx*2).toFixed(1) + ' m · generado por código, sin malla importada';
 
   var botonesVista=document.querySelectorAll('[data-vista]');
   botonesVista.forEach(function(b){

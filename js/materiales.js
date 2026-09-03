@@ -49,7 +49,12 @@ var MAT = {
   maderaButaca:     new THREE.MeshLambertMaterial({map:texMaderaButaca}),
   suelo:      new THREE.MeshLambertMaterial({color:0x3a2118, side:THREE.DoubleSide}),
   parquet:    new THREE.MeshLambertMaterial({map:texParquet, side:THREE.DoubleSide}),
-  alfombra:   new THREE.MeshLambertMaterial({map:texAlfombra, side:THREE.DoubleSide}),
+  // polygonOffset empuja la alfombra hacia la cámara en el buffer de
+  // profundidad (no en el mundo): el pequeño y+0.06 de alfombra() ya no
+  // basta él solo para evitar el parpadeo/hundimiento con el parquet al
+  // verla de lejos o en rasante, así que se combinan las dos.
+  alfombra:   new THREE.MeshLambertMaterial({map:texAlfombra, side:THREE.DoubleSide,
+                 polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4}),
   muro:       new THREE.MeshLambertMaterial({color:0x2a1519, side:THREE.DoubleSide}),
   antepecho:  new THREE.MeshLambertMaterial({color:0x6b2226, side:THREE.DoubleSide}),
   oro:        new THREE.MeshLambertMaterial({color:0xc9922f, emissive:0x2a1c05, side:THREE.DoubleSide}),

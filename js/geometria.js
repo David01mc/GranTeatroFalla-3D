@@ -46,7 +46,7 @@ function alfombra(pts, ancho, mat){
     var p=pts[i], a=pts[Math.max(0,i-1)], b=pts[Math.min(pts.length-1,i+1)];
     var tx=b.x-a.x, tz=b.z-a.z, L=Math.hypot(tx,tz)||1; tx/=L; tz/=L;
     var nx=-tz, nz=tx;
-    var y = geo.rake(p.z)+0.06; // ligeramente por encima del suelo, evita z-fighting a distancia
+    var y = geo.rake(p.z)+0.08; // por encima del suelo; el resto del margen anti z-fighting lo da polygonOffset en MAT.alfombra
     pos.push(p.x-nx*ancho/2, y, p.z-nz*ancho/2,  p.x+nx*ancho/2, y, p.z+nz*ancho/2);
     if(i>0) dist += Math.hypot(p.x-pts[i-1].x, p.z-pts[i-1].z);
     uv.push(0, dist*0.6,  1, dist*0.6);
@@ -99,6 +99,42 @@ var ASIENTOS_LATERAL = [6,6,6, 7,7,7,7,7,7,7,7, 6,5,4,2];
 var CENTRO_MEDIO = ASIENTOS_CENTRO/2*ASIENTO_PASO;              // media anchura del bloque central
 var LATERAL_DENTRO = CENTRO_MEDIO + PASILLO_CENTRAL;             // borde interior (hacia el pasillo central) de cada lateral
 
+// Pasillo transversal justo delante de la fila 1 (no a su altura ni por
+// detrás): termina exactamente donde empieza el patio de butacas —el
+// mismo borde que ya usa pasillosPatio() para arrancar la alfombra— y
+// se extiende PASILLO_CENTRAL hacia el escenario desde ahí. Conecta cada
+// pasillo central con el Palco Frontal de su lado, perpendicular a los
+// pasillos de alfombra. ANCHO_FRONTAL es también la profundidad (en X,
+// desde el muro) del propio Palco Frontal (ver construir() en
+// geometria.js).
+var ANCHO_FRONTAL = 2.5;
+var DESPLAZAMIENTO_FRONTAL_X = 3.0; // 3 m hacia atrás de cada palco, hacia el muro lateral
+var Z_CORREDOR_FIN = Z_FILA1-0.6, Z_CORREDOR_INI = Z_CORREDOR_FIN-PASILLO_CENTRAL;
+
+/* Fondo y frente (en X, lado derecho) del Palco Frontal. Devuelve los
+   límites del lado derecho (signo=+1); el izquierdo es su espejo.
+
+   El palco debe quedar pegado a la boca del escenario, no a media sala:
+   su fondo se ancla justo al borde del arco (P.arcoA), con un pequeño
+   margen. Esa posición deseada se limita («cap») al punto más estrecho
+   del muro real en todo el tramo [0,Z_CORREDOR_INI] — si el muro
+   llegase a estrecharse ahí (como pasaba con la circunferencia + tramo
+   recto de antes de pasar a la elipse), un fondo fijo se saldría de él
+   y quedaría oculto detrás del muro que sí se ve. Con la planta
+   elíptica actual ese límite ya no aprieta (el muro solo se ensancha
+   según nos alejamos del escenario), así que en la práctica manda la
+   posición deseada. */
+function limitesFrontal(){
+  var margenMuro=0.3, xFondoSeguro=1e9, i;
+  for(i=0;i<geo.PLAN.length;i++){
+    if(geo.PLAN[i].x>0 && geo.PLAN[i].z>=0 && geo.PLAN[i].z<=Z_CORREDOR_INI) xFondoSeguro=Math.min(xFondoSeguro, geo.PLAN[i].x);
+  }
+  xFondoSeguro -= margenMuro;
+  var xFondoDeseado = P.arcoA + 1.0;
+  var xFondo = Math.min(xFondoDeseado, xFondoSeguro);
+  return {xFondo:xFondo, xFrente:xFondo-ANCHO_FRONTAL};
+}
+
 function zFila(i){ return Z_FILA1 + i*FILA_PASO; }
 
 /* Los 9x16 asientos del bloque central. */
@@ -113,10 +149,12 @@ function sitiosCentro(){
 
 /* Bloque lateral (signo=-1 izquierda, +1 derecha): pegado al pasillo
    central, con el número de butacas por fila del enunciado; el hueco
-   hacia el muro varía fila a fila y es lo que deja el pasillo lateral. */
+   hacia el muro varía fila a fila y es lo que deja el pasillo lateral.
+   La fila 1 (i=0) se deja libre: ahí cruza el pasillo transversal que
+   lleva del pasillo central al Palco Frontal (ver pasillosPatio()). */
 function sitiosLateral(signo){
   var out=[];
-  for(var i=0;i<FILAS_LATERAL;i++){
+  for(var i=1;i<FILAS_LATERAL;i++){
     var z=zFila(i), n=ASIENTOS_LATERAL[i];
     for(var k=0;k<n;k++){
       var x=signo*(LATERAL_DENTRO + (k+0.5)*ASIENTO_PASO);
@@ -135,7 +173,7 @@ function enBloqueAsientos(x,z){
   var i = Math.round((z-Z_FILA1)/FILA_PASO);
   if(i < 0) return false;
   if(i < FILAS_CENTRO && Math.abs(x) < CENTRO_MEDIO) return true;
-  if(i < FILAS_LATERAL){
+  if(i > 0 && i < FILAS_LATERAL){
     var ancho = ASIENTOS_LATERAL[i]*ASIENTO_PASO;
     if(Math.abs(x) >= LATERAL_DENTRO && Math.abs(x) < LATERAL_DENTRO+ancho){
       return geo.distAPlanta(x,z) >= PASILLO_LATERAL; // coincide con la salvaguarda de sitiosLateral()
@@ -164,6 +202,15 @@ function pasillosPatio(){
     var pts=[{x:signo*cx, z:zIni}, {x:signo*cx, z:zFin}];
     g.add(alfombra(pts, anchoAlfombra, MAT.alfombra));
   });
+  // Alfombra transversal, perpendicular a las dos de arriba: justo
+  // delante de la fila 1 (Z_CORREDOR_INI..FIN), de Palco Frontal a Palco
+  // Frontal, cruzando también por delante del bloque central — una sola
+  // pieza continua (no dos tramos con un hueco en medio) para que enlace
+  // sin costura con las dos alfombras verticales en Z_CORREDOR_FIN. A
+  // todo el ancho del pasillo (no con el margen de las de arriba).
+  var zCruce=(Z_CORREDOR_INI+Z_CORREDOR_FIN)/2, xFrenteFrontal=limitesFrontal().xFrente;
+  var ptsCruce=[{x:-xFrenteFrontal, z:zCruce}, {x:xFrenteFrontal, z:zCruce}];
+  g.add(alfombra(ptsCruce, PASILLO_CENTRAL, MAT.alfombra));
   return g;
 }
 
@@ -474,26 +521,115 @@ function lampara(){
   return g;
 }
 
-/* Tabiques de separación entre palcos: postes de yeso cada cierto nº de
-   puntos del borde, entre los índices [ini,fin] (ambos de "borde" y de
-   "geo.PLAN", que comparten índice punto a punto). yBase da la altura
-   del suelo del palco en cada punto (constante en los pisos altos, y
-   siguiendo la pendiente del patio en la platea). */
-function separadoresPalco(escena, borde, plan, ini, fin, n, yBase, alto){
-  if(n<2 || fin<=ini) return;
-  // n-1 tabiques repartidos a partes iguales entre ini y fin: así el
-  // tramo queda dividido en exactamente n palcos, sin el redondeo que
-  // arrastraría un "paso" fijo (que puede dejar un palco de más o de
-  // menos según el resto de la división).
+/* n+1 índices que reparten el tramo [ini,fin] de "plan" en n partes de
+   longitud de arco igual. Repartir por índice a secas (ini+k*(fin-ini)/n)
+   sale muy desigual donde el trazado pasa del tramo recto de la jamba al
+   arco de la herradura: ahí los puntos están mucho más juntos, así que
+   dos cortes "equiespaciados en índice" pueden caer casi en el mismo
+   sitio físico. */
+function indicesPorLongitud(plan, ini, fin, n){
+  var acc=[0], i;
+  for(i=ini+1;i<=fin;i++) acc.push(acc[acc.length-1]+Math.hypot(plan[i].x-plan[i-1].x, plan[i].z-plan[i-1].z));
+  var total=acc[acc.length-1], out=[ini];
   for(var k=1;k<n;k++){
-    var i=Math.round(ini + k*(fin-ini)/n);
-    var p=borde[i], q=plan[i];
-    var y0=(typeof yBase==='function')?yBase(p):yBase;
-    var div=new THREE.Mesh(new THREE.BoxGeometry(0.16, alto+1.5, 1.5), MAT.yeso);
-    div.position.set((p.x*0.75+q.x*0.25), y0+(alto+1.5)/2, (p.z*0.75+q.z*0.25));
-    div.rotation.y=Math.atan2(q.x-p.x, q.z-p.z);
-    escena.add(div);
+    var objetivo=total*k/n, j=0;
+    while(j<acc.length-1 && acc[j+1]<objetivo) j++;
+    out.push(ini+j);
   }
+  out.push(fin);
+  return out;
+}
+
+/* Un solo poste de yeso, en el índice "i" de "borde"/"plan" (comparten
+   índice punto a punto). yBase da la altura del suelo del palco ahí. */
+function posteYesoEnIndice(escena, borde, plan, i, yBase, alto){
+  var p=borde[i], q=plan[i];
+  var y0=(typeof yBase==='function')?yBase(p):yBase;
+  var div=new THREE.Mesh(new THREE.BoxGeometry(0.16, alto+1.5, 1.5), MAT.yeso);
+  div.position.set((p.x*0.75+q.x*0.25), y0+(alto+1.5)/2, (p.z*0.75+q.z*0.25));
+  div.rotation.y=Math.atan2(q.x-p.x, q.z-p.z);
+  escena.add(div);
+}
+
+/* Tabiques de separación entre palcos: postes de yeso repartidos a partes
+   iguales (en longitud real, no en índice) entre los índices [ini,fin]
+   (ambos de "borde" y de "geo.PLAN", que comparten índice punto a punto).
+   yBase da la altura del suelo del palco en cada punto (constante en los
+   pisos altos, y siguiendo la pendiente del patio —más la peana— en la
+   platea). Devuelve los índices de corte, para que quien llame pueda
+   repartir asientos por el mismo criterio. */
+function separadoresPalco(escena, borde, plan, ini, fin, n, yBase, alto){
+  if(n<2 || fin<=ini) return [ini,fin];
+  var idx=indicesPorLongitud(plan, ini, fin, n);
+  for(var k=1;k<n;k++) posteYesoEnIndice(escena, borde, plan, idx[k], yBase, alto);
+  return idx;
+}
+
+/* Barandilla ornamentada de los palcos de platea: zócalo bajo + una fila
+   de balaustres dorados + pasamanos, en vez del antepecho macizo de
+   terciopelo de los pisos de arriba — así se nota que el palco está
+   sobre una peana y no es una simple continuación del muro. Cubre todo
+   el anillo (también el tramo central sin tabicar). */
+function barandillaPalco(escena, borde, yBase, alto){
+  escena.add(cinta(borde, yBase, function(p){return yBase(p)+0.12;}, MAT.antepecho));       // zócalo
+  escena.add(cinta(borde, function(p){return yBase(p)+alto-0.06;}, function(p){return yBase(p)+alto;}, MAT.oro)); // pasamanos
+  for(var i=0;i<borde.length;i++){
+    var p=borde[i], y0=yBase(p);
+    var bal=new THREE.Mesh(new THREE.BoxGeometry(0.05, alto-0.16, 0.05), MAT.oro);
+    bal.position.set(p.x, y0+0.12+(alto-0.16)/2, p.z);
+    escena.add(bal);
+  }
+}
+
+/* Silla suelta de palco: más sencilla que la butaca del patio (se ve de
+   lejos y en grupos de 6), pero con los mismos materiales de tela y
+   madera para que no desentone. Mirando hacia -z en reposo, igual que
+   las butacas del patio. */
+function construirSillaPalco(){
+  var asiento=new THREE.BoxGeometry(0.40,0.08,0.38); asiento.translate(0,0.44,0);
+  var respaldo=new THREE.BoxGeometry(0.40,0.42,0.06); respaldo.translate(0,0.67,0.16);
+  var base=new THREE.BoxGeometry(0.36,0.40,0.34); base.translate(0,0.20,0);
+  return {asiento:asiento, respaldo:respaldo, base:base};
+}
+
+/* Reparte 6 sillas (3 filas de 2) por cada uno de los "nCeldas" palcos
+   entre [ini,fin], mirando hacia el patio/escenario (de "plan", el muro,
+   hacia "borde", la barandilla). Usa los mismos cortes por longitud que
+   separadoresPalco(), así cada grupo de sillas cae centrado en su palco. */
+function sillasPalco(escena, borde, plan, ini, fin, nCeldas, yBase, sillaGeo){
+  var idx=indicesPorLongitud(plan, ini, fin, nCeldas);
+  var transforms=[];
+  for(var c=0;c<nCeldas;c++){
+    var i=Math.round((idx[c]+idx[c+1])/2);
+    var pIn=borde[i], pOut=plan[i];
+    var fx=pIn.x-pOut.x, fz=pIn.z-pOut.z, fl=Math.hypot(fx,fz)||1; fx/=fl; fz/=fl; // hacia la barandilla/patio
+    var rx=fz, rz=-fx; // tangente al palco, para separar las 2 sillas de cada fila
+    var rotY=Math.atan2(-fx,-fz);
+    [0.18,0.42,0.66].forEach(function(prof){
+      var cx=pIn.x+(pOut.x-pIn.x)*prof, cz=pIn.z+(pOut.z-pIn.z)*prof;
+      // La altura del suelo del palco varía con la profundidad (la peana
+      // es más alta junto al escenario y decae hacia el fondo), así que
+      // se evalúa en el punto de cada fila, no en el de la barandilla.
+      var y0=yBase({z:cz});
+      [-0.35,0.35].forEach(function(lado){
+        transforms.push({x:cx+rx*lado, y:y0, z:cz+rz*lado, rotY:rotY});
+      });
+    });
+  }
+  var m4=new THREE.Matrix4(), q=new THREE.Quaternion(), ejeY=new THREE.Vector3(0,1,0),
+      esc=new THREE.Vector3(1,1,1), pos3=new THREE.Vector3();
+  ['asiento','respaldo','base'].forEach(function(parte){
+    var mat = parte==='base' ? MAT.maderaButaca : MAT.terciopeloButaca;
+    var im=new THREE.InstancedMesh(sillaGeo[parte], mat, transforms.length);
+    transforms.forEach(function(t,i2){
+      pos3.set(t.x,t.y,t.z);
+      q.setFromAxisAngle(ejeY,t.rotY);
+      m4.compose(pos3,q,esc);
+      im.setMatrixAt(i2,m4);
+    });
+    im.instanceMatrix.needsUpdate=true;
+    escena.add(im);
+  });
 }
 
 /* ---------------- MONTAJE ----------------------------------------- */
@@ -506,34 +642,98 @@ function construir(escena){
   escena.add(cinta(geo.PLAN, function(p){return geo.rake(p.z);}, P.altura, MAT.muro));
 
   // Los cuatro niveles de la herradura.
+  //
+  // La platea tiene tres piezas distintas, no un anillo continuo:
+  //  - El Palco Frontal, uno a cada lado, encajado en el tramo recto de
+  //    la jamba (junto al arco de boca), a la altura del escenario: no
+  //    seríamos capaces de sentarnos con la peana normal, tan escorados
+  //    y tan cerca, así que va como pieza aparte, plana, a su propia
+  //    altura fija.
+  //  - El Antepalco: un hueco/pasillo de salida entre el Palco Frontal y
+  //    el primer palco de la platea, sin suelo ni peana propios todavía
+  //    (se dejará listo para puerta/pasillo más adelante).
+  //  - El ala de la platea en sí: los 9 palcos por lado sobre la peana
+  //    normal, empezando ya pasado el Antepalco.
+  var ALTURA_FRONTAL = geo.escenario.altura + 0.10; // suelo del palco junto al escenario: un poco por encima de las tablas
+  var ELEVACION_PLATEA = 0.40;                      // peana normal del resto del ala
+  var sillaPalcoGeo = null;   // se construye una sola vez, la primera vez que hace falta
   P.pisos.forEach(function(piso, n){
     var borde = geo.dentro(geo.PLAN, piso.dentro);
-    var yPiso = (n===0) ? function(p){return geo.rake(p.z);} : piso.y;
-    var yTop  = (n===0) ? function(p){return geo.rake(p.z)+piso.alto;} : piso.y+piso.alto;
+    // yPiso/yTop siempre como función de p, aunque en los pisos altos sea
+    // un valor constante: así la moldura de abajo no necesita distinguir
+    // el caso de la platea (suelo en pendiente) del resto (suelo plano).
+    var yPiso = (n===0) ? function(p){return geo.rake(p.z)+ELEVACION_PLATEA;} : function(){return piso.y;};
+    var yTop  = (n===0) ? function(p){return geo.rake(p.z)+ELEVACION_PLATEA+piso.alto;} : function(){return piso.y+piso.alto;};
 
-    escena.add(cinta(borde, yPiso, yTop, MAT.antepecho));                 // antepecho
-    escena.add(banda(borde, geo.PLAN, yTop, yTop, MAT.hueco));            // hueco del palco
-    escena.add(banda(borde, geo.PLAN, yPiso, yPiso, MAT.suelo));          // suelo del palco
-    escena.add(cinta(borde,
-      (n===0)?function(p){return geo.rake(p.z)+piso.alto;}:piso.y+piso.alto,
-      (n===0)?function(p){return geo.rake(p.z)+piso.alto+0.14;}:piso.y+piso.alto+0.14,
-      MAT.oro));                                                          // moldura
-
-    if(piso.palcos){                                                      // separadores (todo el perímetro)
-      separadoresPalco(escena, borde, geo.PLAN, 0, borde.length-1, piso.palcos, piso.y, piso.alto);
-    }
-
-    if(n===0 && piso.palcosLado){
-      // Palcos de platea: solo en las dos alas laterales: el tramo central
-      // trasero (a la altura de los pasillos centrales, futuro palco de
-      // autoridades) se queda sin tabicar. geo.PLAN cruza x=±umbral cerca
-      // del fondo de la sala; se busca ese corte por simetría del arco.
-      var umbral=(CENTRO_MEDIO+LATERAL_DENTRO)/2, corteD=-1, ci;
+    if(n===0){
+      // El ala de la platea arranca donde termina el pasillo transversal
+      // (a la profundidad Z_CORREDOR_FIN, justo pasada la fila 1), no a
+      // un nº de metros de arco de la jamba: se busca el primer punto de
+      // la curva que ya está a esa profundidad. corteD/corteI, como
+      // antes, marcan el otro extremo del ala (a la altura de los
+      // pasillos centrales, antes del futuro palco de autoridades).
+      var iAlaD=-1, ci;
+      for(ci=0; ci<geo.PLAN.length; ci++){ if(geo.PLAN[ci].z>=Z_CORREDOR_FIN){ iAlaD=ci; break; } }
+      var iAlaI=geo.PLAN.length-1-iAlaD;
+      var umbral=(CENTRO_MEDIO+LATERAL_DENTRO)/2, corteD=-1;
       for(ci=0; ci<geo.PLAN.length; ci++){ if(geo.PLAN[ci].x<=umbral){ corteD=ci; break; } }
       var corteI=(geo.PLAN.length-1)-corteD;
-      var yBasePlatea=function(p){return geo.rake(p.z);};
-      separadoresPalco(escena, borde, geo.PLAN, 0, corteD, piso.palcosLado, yBasePlatea, piso.alto);
-      separadoresPalco(escena, borde, geo.PLAN, corteI, borde.length-1, piso.palcosLado, yBasePlatea, piso.alto);
+
+      if(!sillaPalcoGeo) sillaPalcoGeo = construirSillaPalco();
+      var yFrontal=function(){return ALTURA_FRONTAL;};
+
+      // Palco Frontal: un cajón recto empotrado junto al arco de boca,
+      // del arco (z=0) al pasillo transversal (Z_CORREDOR_INI), mirando
+      // de canto hacia el centro de la sala — así los dos, en paralelo,
+      // quedan enfrentados el uno al otro a través del escenario, en vez
+      // de escorados como el resto del ala. El punto intermedio (z/2) no
+      // cambia la recta, pero le da a sillasPalco() un índice real en el
+      // que centrar el grupo de sillas. limitesFrontal() aparta el fondo
+      // del muro real (ver su comentario: un fondo fijo al ancho de la
+      // jamba quedaría oculto detrás del muro).
+      var limFrontal=limitesFrontal();
+      [-1,1].forEach(function(signo){
+        var xFondo=signo*(limFrontal.xFondo+DESPLAZAMIENTO_FRONTAL_X), xFrente=signo*(limFrontal.xFrente+DESPLAZAMIENTO_FRONTAL_X), zMed=Z_CORREDOR_INI/2;
+        var bF=[{x:xFrente,z:0},{x:xFrente,z:zMed},{x:xFrente,z:Z_CORREDOR_INI}];
+        var plF=[{x:xFondo,z:0},{x:xFondo,z:zMed},{x:xFondo,z:Z_CORREDOR_INI}];
+        escena.add(cinta(bF, function(p){return geo.rake(p.z);}, yFrontal, MAT.maderaButaca)); // peana
+        barandillaPalco(escena, bF, yFrontal, piso.alto);
+        escena.add(banda(bF, plF, function(){return ALTURA_FRONTAL+piso.alto;}, function(){return ALTURA_FRONTAL+piso.alto;}, MAT.hueco));
+        escena.add(banda(bF, plF, yFrontal, yFrontal, MAT.suelo));
+        escena.add(cinta(bF, function(){return ALTURA_FRONTAL+piso.alto;}, function(){return ALTURA_FRONTAL+piso.alto+0.14;}, MAT.oro));
+        sillasPalco(escena, bF, plF, 0, 2, 1, yFrontal, sillaPalcoGeo);
+        // Tabique que cierra el Frontal hacia el pasillo transversal.
+        var cierre=new THREE.Mesh(new THREE.BoxGeometry(ANCHO_FRONTAL, piso.alto+1.5, 0.16), MAT.yeso);
+        cierre.position.set((xFondo+xFrente)/2, ALTURA_FRONTAL+(piso.alto+1.5)/2, Z_CORREDOR_INI);
+        escena.add(cierre);
+      });
+
+      // El ala en sí (peana+barandilla+suelo+moldura continuos, y dentro,
+      // los 9 palcos tabicados con sus sillas), de iAla a corte y de
+      // corte a iAla especular — así el Antepalco (de iArco a iAla) y el
+      // hueco central (de corteD a corteI) quedan sin construir.
+      var bAla=borde.slice(iAlaD,iAlaI+1), plAla=geo.PLAN.slice(iAlaD,iAlaI+1);
+      escena.add(cinta(bAla, function(p){return geo.rake(p.z);}, yPiso, MAT.maderaButaca)); // peana
+      barandillaPalco(escena, bAla, yPiso, piso.alto);
+      // Trasdós: misma forma que la herradura pero más retranqueado (más
+      // cerca del muro real), para que el ala tenga volumen real y no
+      // sea una peana de espesor cero. De momento sin textura.
+      var trasdos = geo.dentro(geo.PLAN, piso.dentro*0.35).slice(iAlaD,iAlaI+1);
+      escena.add(cinta(trasdos, function(p){return geo.rake(p.z);}, yPiso, MAT.maderaButaca));
+      escena.add(banda(bAla, plAla, yTop, yTop, MAT.hueco));
+      escena.add(banda(bAla, plAla, yPiso, yPiso, MAT.suelo));
+      escena.add(cinta(bAla, yTop, function(p){return yTop(p)+0.14;}, MAT.oro));
+
+      separadoresPalco(escena, borde, geo.PLAN, iAlaD, corteD, piso.palcosLado, yPiso, piso.alto);
+      separadoresPalco(escena, borde, geo.PLAN, corteI, iAlaI, piso.palcosLado, yPiso, piso.alto);
+      sillasPalco(escena, borde, geo.PLAN, iAlaD, corteD, piso.palcosLado, yPiso, sillaPalcoGeo);
+      sillasPalco(escena, borde, geo.PLAN, corteI, iAlaI, piso.palcosLado, yPiso, sillaPalcoGeo);
+    } else {
+      escena.add(cinta(borde, yPiso, yTop, MAT.antepecho));                 // antepecho
+      escena.add(banda(borde, geo.PLAN, yTop, yTop, MAT.hueco));            // hueco del palco
+      escena.add(banda(borde, geo.PLAN, yPiso, yPiso, MAT.suelo));          // suelo del palco
+      escena.add(cinta(borde, yTop, function(p){return yTop(p)+0.14;}, MAT.oro)); // moldura
+      if(piso.palcos) separadoresPalco(escena, borde, geo.PLAN, 0, borde.length-1, piso.palcos, piso.y, piso.alto);
     }
   });
 
@@ -557,6 +757,16 @@ function construir(escena){
   var focoIzq=new THREE.PointLight(0xffb88a, 0.35, 26); focoIzq.position.set(-7,6,9); escena.add(focoIzq);
   var focoDer=new THREE.PointLight(0xffb88a, 0.35, 26); focoDer.position.set(7,6,9); escena.add(focoDer);
   var candilejas=new THREE.PointLight(0xfff0d0, 1.1, 30); candilejas.position.set(0,4.5,-3); escena.add(candilejas);
+  // Los Palcos Frontales quedan en un rincón que ninguna de las luces de
+  // arriba alcanza bien (lejos de la araña, por debajo de los focos
+  // laterales): sin luz propia, la barandilla dorada y las sillas se ven
+  // casi negras contra el muro. Una luz suave por palco basta.
+  var limFrontalLuz=limitesFrontal();
+  [-1,1].forEach(function(signo){
+    var focoFrontal=new THREE.PointLight(0xffcf9a, 0.55, 12);
+    focoFrontal.position.set(signo*((limFrontalLuz.xFondo+limFrontalLuz.xFrente)/2+DESPLAZAMIENTO_FRONTAL_X), 2.6, Z_CORREDOR_INI/2);
+    escena.add(focoFrontal);
+  });
 
   return {nButacas:nButacas, nFilas:nFilas};
 }
