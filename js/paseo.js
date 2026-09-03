@@ -13,8 +13,9 @@ var geo = FALLA.geo;
 var VELOCIDAD = 3.5;       // m/s
 var ALTURA_OJO = 1.7;      // m
 var GRAVEDAD = 18;         // m/s^2 — arco de salto corto, a juego con la escala de la sala
-var IMPULSO_SALTO = 6.2;   // m/s
+var IMPULSO_SALTO = 7.0;   // m/s — permite alcanzar la platea de 1.22 m
 var MARGEN_MURO = 0.35;    // separación mínima al muro exterior del patio
+var MARGEN_ATERRIZAJE = 0.14; // tolerancia de los pies al coronar una plataforma
 
 var activo=false;
 var camara=null, elemento=null;
@@ -31,8 +32,15 @@ function terrenoAltura(x,z){
   var esc=geo.escenario;
   if(Math.abs(x) < esc.mitadX && z <= esc.zFrente && z >= esc.zFondo) return esc.altura;
 
+  var alturaEscalera=geo.alturaEscaleraLateral(x,z);
+  if(alturaEscalera!==null) return alturaEscalera;
+
   // El muro de la embocadura solo tiene hueco entre -arcoA y +arcoA.
   if(z > -0.6 && z < 0.35 && Math.abs(x) > geo.P.arcoA) return null;
+
+  // Suelo horizontal elevado de la platea. Por ahora solo colisiona la
+  // plataforma: sus sillas y demás mobiliario se mantienen atravesables.
+  if(geo.enPlatea(x,z)) return geo.platea.altura;
 
   if(geo.dentroDePlanta(x,z) && geo.distAPlanta(x,z) > MARGEN_MURO) return geo.rake(z);
 
@@ -44,16 +52,32 @@ function terrenoAltura(x,z){
    un salto sirve para cruzar por encima de una fila. */
 function posicionValida(px,pz){
   if(terrenoAltura(px,pz)===null) return false;
-  if(alturaSalto<=0.02 && geo.enBloqueAsientos(px,pz)) return false;
+  if(alturaSalto<=0.02 && !geo.enPlatea(px,pz) && geo.enBloqueAsientos(px,pz)) return false;
+  return true;
+}
+
+/* Intenta trasladar al jugador conservando la altura absoluta de sus
+   pies. Una plataforma alta solo se puede cruzar cuando el salto ya ha
+   alcanzado su cota; al coronarla, el jugador aterriza sobre ella en vez
+   de atravesarla o ser teletransportado hacia arriba. */
+function intentarPosicion(nx,nz){
+  if(!posicionValida(nx,nz)) return false;
+  var sueloActual=terrenoAltura(x,z), sueloNuevo=terrenoAltura(nx,nz);
+  if(sueloActual===null || sueloNuevo===null) return false;
+  var alturaPies=sueloActual+alturaSalto;
+  if(sueloNuevo>sueloActual+0.25 && alturaPies+MARGEN_ATERRIZAJE<sueloNuevo) return false;
+  x=nx; z=nz;
+  alturaSalto=Math.max(0,alturaPies-sueloNuevo);
+  if(alturaSalto===0 && velocidadSalto<0) velocidadSalto=0;
   return true;
 }
 
 /* Resuelve el movimiento eje a eje, para deslizar sobre los obstáculos
    en vez de quedarse bloqueado en seco al tocarlos. */
 function moverA(nx, nz){
-  if(posicionValida(nx,nz)){ x=nx; z=nz; return; }
-  if(posicionValida(nx,z)){ x=nx; return; }
-  if(posicionValida(x,nz)){ z=nz; return; }
+  if(intentarPosicion(nx,nz)) return;
+  if(intentarPosicion(nx,z)) return;
+  intentarPosicion(x,nz);
 }
 
 function saltar(){

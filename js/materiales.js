@@ -20,6 +20,10 @@ var texMaderaBlanca = textura('Textures/MaderaBlanca.png', 1, 1);
 var texMaderaPlatea = textura('Textures/MaderaPlateaInferior.png', 1, 1);
 var texTerciopelo2  = textura('Textures/TerciopeloButaca2.png', 1, 1);
 var texBarnizClaro  = textura('Textures/BarnizBlancoClaraHuevo.png', 18, 1);
+var texMudejarGeo   = textura('Textures/MudejarGeometrico.png', 1, 1);
+var texMudejarFloral= textura('Textures/MudejarFloral.png', 1, 2);
+var texMudejarArcos = textura('Textures/MudejarArcos.png', 6, 1);
+var texPuertaPalco  = cargador.load('Textures/PuertaPalcoMudejar.png');
 
 /* Carga una textura y le rebaja la saturación (mezcla cada píxel hacia
    su propio gris en el porcentaje indicado) antes de asignarla al
@@ -58,6 +62,10 @@ var MAT = {
   maderaPlatea:     new THREE.MeshLambertMaterial({map:texMaderaPlatea, side:THREE.DoubleSide}),
   terciopelo2:      new THREE.MeshLambertMaterial({map:texTerciopelo2, side:THREE.DoubleSide}),
   barnizClaro:      new THREE.MeshLambertMaterial({map:texBarnizClaro, color:0x8f8a80}),
+  mudejarGeometrico:new THREE.MeshLambertMaterial({map:texMudejarGeo, color:0xbdb4a3, side:THREE.DoubleSide}),
+  mudejarFloral:    new THREE.MeshLambertMaterial({map:texMudejarFloral, color:0xb8ae9c}),
+  mudejarArcos:     new THREE.MeshLambertMaterial({map:texMudejarArcos, color:0xbdb3a1}),
+  puertaPalco:      new THREE.MeshLambertMaterial({map:texPuertaPalco}),
   suelo:      new THREE.MeshLambertMaterial({color:0x3a2118, side:THREE.DoubleSide}),
   parquet:    new THREE.MeshLambertMaterial({map:texParquet, side:THREE.DoubleSide}),
   parquetPlatea:new THREE.MeshLambertMaterial({map:texParquetPlatea, side:THREE.DoubleSide}),

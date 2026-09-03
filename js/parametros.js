@@ -43,6 +43,18 @@ function planta(){
 }
 var PLAN = planta();
 
+/* Dos escaleras simétricas en los pasillos laterales próximos al
+   escenario. zBajo es el arranque desde el patio y zAlto el desembarco. */
+var ESCALERAS_LATERALES={centroX:8.20,ancho:1.20,zBajo:3.20,zAlto:0.20,altura:1.05,peldanos:7};
+
+function alturaEscaleraLateral(x,z){
+  var e=ESCALERAS_LATERALES;
+  if(Math.abs(Math.abs(x)-e.centroX)>e.ancho/2 || z<e.zAlto || z>e.zBajo) return null;
+  var avance=(e.zBajo-z)/(e.zBajo-e.zAlto);
+  var escalon=Math.max(0,Math.min(e.peldanos,Math.ceil(avance*e.peldanos)));
+  return e.altura*escalon/e.peldanos;
+}
+
 /* Desplaza la planta hacia dentro d metros (para pisos y antepechos). */
 function dentro(pts,d){
   var out=[],i;
@@ -65,6 +77,25 @@ function dentroDePlanta(x,z){
   }
   return d;
 }
+
+/* Huella horizontal de la platea inferior. Es la franja comprendida
+   entre el muro exterior y el borde retranqueado 2.9 m, desde el final
+   del pasillo transversal hacia el fondo de la herradura. */
+var BORDE_PLATEA=dentro(PLAN,P.pisos[0].dentro);
+var EXTERIOR_ANTEPALCO=dentro(PLAN,-2.0);
+function dentroDeContornoAbierto(pts,x,z){
+  // El test de rayos cierra implícitamente el último punto con el primero.
+  var poly=pts;
+  var dentro=false,i,j;
+  for(i=0,j=poly.length-1;i<poly.length;j=i++){
+    if(((poly[i].z>z)!==(poly[j].z>z)) &&
+       (x<(poly[j].x-poly[i].x)*(z-poly[i].z)/(poly[j].z-poly[i].z)+poly[i].x)) dentro=!dentro;
+  }
+  return dentro;
+}
+function enPlatea(x,z){
+  return z>=3.2 && dentroDeContornoAbierto(EXTERIOR_ANTEPALCO,x,z) && !dentroDeContornoAbierto(BORDE_PLATEA,x,z);
+}
 function distAPlanta(x,z){
   var m=1e9,i;
   for(i=0;i<PLAN.length-1;i++){
@@ -83,6 +114,10 @@ FALLA.geo = {
   dentro: dentro,
   dentroDePlanta: dentroDePlanta,
   distAPlanta: distAPlanta,
+  enPlatea: enPlatea,
+  platea: {altura:rake(P.zc+P.Rz)+0.40},
+  escalerasLaterales: ESCALERAS_LATERALES,
+  alturaEscaleraLateral: alturaEscaleraLateral,
   // caja del suelo del escenario (ver geometria.js: escenario()) — la usa el modo paseo para pisar las tablas
   escenario: {altura:1.05, mitadX:9, zFondo:-17, zFrente:-0.7}
 };
