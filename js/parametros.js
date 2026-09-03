@@ -43,14 +43,16 @@ function planta(){
 }
 var PLAN = planta();
 
-/* Dos escaleras simétricas en los pasillos laterales próximos al
-   escenario. zBajo es el arranque desde el patio y zAlto el desembarco. */
-var ESCALERAS_LATERALES={centroX:8.20,ancho:1.20,zBajo:3.20,zAlto:0.20,altura:1.05,peldanos:7};
+/* Dos escaleras simétricas en el hueco transversal entre el palco
+   frontal y el primer palco de platea. Suben desde el pasillo hacia el
+   lateral (eje X), nunca en dirección al escenario. */
+var ESCALERAS_LATERALES={centroZ:2.50,ancho:1.20,xBajo:7.00,xAlto:9.00,altura:1.05,peldanos:7};
 
 function alturaEscaleraLateral(x,z){
   var e=ESCALERAS_LATERALES;
-  if(Math.abs(Math.abs(x)-e.centroX)>e.ancho/2 || z<e.zAlto || z>e.zBajo) return null;
-  var avance=(e.zBajo-z)/(e.zBajo-e.zAlto);
+  var ax=Math.abs(x);
+  if(Math.abs(z-e.centroZ)>e.ancho/2 || ax<e.xBajo || ax>e.xAlto) return null;
+  var avance=(ax-e.xBajo)/(e.xAlto-e.xBajo);
   var escalon=Math.max(0,Math.min(e.peldanos,Math.ceil(avance*e.peldanos)));
   return e.altura*escalon/e.peldanos;
 }
