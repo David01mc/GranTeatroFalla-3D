@@ -11,47 +11,24 @@ function textura(ruta, repX, repY){
   t.repeat.set(repX, repY);
   return t;
 }
-var texParquet      = textura('Textures/Parquet.png', 14, 16);
-var texParquetPlatea= textura('Textures/Parquet.png', 1, 1);
-var texAlfombra     = textura('Textures/RedCarpet.png', 1, 1); // el largo se controla en el propio UV de la alfombra
-var texTelon        = textura('Textures/Telon.png', 1, 1);     // ídem: el UV de la cortina ya mete su propio repetido
-var texMaderaButaca = textura('Textures/MaderaButaca.png', 1, 1);
-var texMaderaBlanca = textura('Textures/MaderaBlanca.png', 1, 1);
-var texMaderaPlatea = textura('Textures/MaderaPlateaInferior.png', 1, 1);
-var texTerciopelo2  = textura('Textures/TerciopeloButaca2.png', 1, 1);
-var texBarnizClaro  = textura('Textures/BarnizBlancoClaraHuevo.png', 18, 1);
-var texMudejarGeo   = textura('Textures/MudejarGeometrico.png', 1, 1);
-var texMudejarFloral= textura('Textures/MudejarFloral.png', 1, 2);
-var texMudejarArcos = textura('Textures/MudejarArcos.png', 6, 1);
-var texPuertaPalco  = cargador.load('Textures/PuertaPalcoMudejar.png');
+var texParquet      = textura('Textures/Parquet.webp', 14, 16);
+var texParquetPlatea= textura('Textures/Parquet.webp', 1, 1);
+var texAlfombra     = textura('Textures/RedCarpet.webp', 1, 1); // el largo se controla en el propio UV de la alfombra
+var texTelon        = textura('Textures/Telon.webp', 1, 1);     // ídem: el UV de la cortina ya mete su propio repetido
+var texMaderaButaca = textura('Textures/MaderaButaca.webp', 1, 1);
+var texMaderaBlanca = textura('Textures/MaderaBlanca.webp', 1, 1);
+var texMaderaPlatea = textura('Textures/MaderaPlateaInferior.webp', 1, 1);
+var texTerciopelo   = textura('Textures/TerciopeloButaca.webp', 1, 1);
+var texTerciopelo2  = textura('Textures/TerciopeloButaca2.webp', 1, 1);
+var texBarnizClaro  = textura('Textures/BarnizBlancoClaraHuevo.webp', 18, 1);
+var texMudejarGeo   = textura('Textures/MudejarGeometrico.webp', 1, 1);
+var texMudejarFloral= textura('Textures/MudejarFloral.webp', 1, 2);
+var texMudejarArcos = textura('Textures/MudejarArcos.webp', 6, 1);
+var texPuertaPalco  = cargador.load('Textures/PuertaPalcoMudejar.webp');
 
-/* Carga una textura y le rebaja la saturación (mezcla cada píxel hacia
-   su propio gris en el porcentaje indicado) antes de asignarla al
-   material — la foto del terciopelo de la butaca venía demasiado roja. */
-function texturaDesaturada(ruta, factor, material){
-  var img = new Image();
-  img.onload = function(){
-    var c = document.createElement('canvas');
-    c.width = img.naturalWidth; c.height = img.naturalHeight;
-    var ctx = c.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    var datos = ctx.getImageData(0, 0, c.width, c.height), d = datos.data;
-    for(var i=0; i<d.length; i+=4){
-      var gris = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
-      d[i]   += (gris-d[i])  *factor;
-      d[i+1] += (gris-d[i+1])*factor;
-      d[i+2] += (gris-d[i+2])*factor;
-    }
-    ctx.putImageData(datos, 0, 0);
-    var t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    material.map = t;
-    material.needsUpdate = true;
-  };
-  img.src = ruta;
-}
-var matTerciopeloButaca = new THREE.MeshLambertMaterial({color:new THREE.Color(0.90,1,1)});
-texturaDesaturada('Textures/TerciopeloButaca.png', 0.45, matTerciopeloButaca);
+// La versión WebP ya está desaturada offline: evita crear un canvas y
+// recorrer millones de píxeles durante el arranque.
+var matTerciopeloButaca = new THREE.MeshLambertMaterial({map:texTerciopelo,color:new THREE.Color(0.90,1,1)});
 
 var MAT = {
   terciopeloButaca: matTerciopeloButaca,

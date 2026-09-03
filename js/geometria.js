@@ -662,19 +662,25 @@ function barandillaPalco(escena, borde, yBase, alto){
   escena.add(cinta(borde, yBase, function(p){return yBase(p)+0.12;}, MAT.antepecho));       // zócalo
   escena.add(cinta(borde, function(p){return yBase(p)+alto-0.025;}, function(p){return yBase(p)+alto;}, MAT.terciopelo2)); // pasamanos fino tapizado
   var altoBal=Math.max(0.30,alto-0.17), geoBal=geometriaBalaustreOrnamental(altoBal);
-  var separacion=0.34;
+  var separacion=0.34, transforms=[];
   for(var i=0;i<borde.length-1;i++){
     var a=borde[i], b=borde[i+1], dx=b.x-a.x, dz=b.z-a.z;
     var largo=Math.hypot(dx,dz), cantidad=Math.max(1,Math.round(largo/separacion));
     for(var j=0;j<cantidad;j++){
       var t=(j+0.5)/cantidad, x=a.x+dx*t, z=a.z+dz*t;
-      var punto={x:x,z:z}, bal=new THREE.Mesh(geoBal,MAT.barnizClaro);
-      bal.position.set(x,yBase(punto)+0.13,z);
-      // El ancho del recorte sigue la tangente de la herradura.
-      bal.rotation.y=-Math.atan2(dz,dx);
-      escena.add(bal);
+      var punto={x:x,z:z};
+      transforms.push({x:x,y:yBase(punto)+0.13,z:z,rotY:-Math.atan2(dz,dx)});
     }
   }
+  var instancias=new THREE.InstancedMesh(geoBal,MAT.barnizClaro,transforms.length);
+  var matriz=new THREE.Matrix4(), quat=new THREE.Quaternion(), ejeY=new THREE.Vector3(0,1,0);
+  var escala=new THREE.Vector3(1,1,1), posicion=new THREE.Vector3();
+  transforms.forEach(function(t,n){
+    posicion.set(t.x,t.y,t.z); quat.setFromAxisAngle(ejeY,t.rotY);
+    matriz.compose(posicion,quat,escala); instancias.setMatrixAt(n,matriz);
+  });
+  instancias.instanceMatrix.needsUpdate=true;
+  escena.add(instancias);
 }
 
 /* Silla suelta de palco: más sencilla que la butaca del patio (se ve de
@@ -747,15 +753,16 @@ function geometriaCortinaPalco(ancho,alto,lado){
 /* Columna compartida entre dos arcos: llega hasta el forjado, mientras
    que su capitel escalonado marca el arranque del arco a media altura. */
 function columnaMudejar(alto,arranque){
-  var g=new THREE.Group(), fuste=new THREE.Mesh(new THREE.BoxGeometry(0.14,alto-0.12,0.15),MAT.mudejarFloral);
-  fuste.position.y=0.06+(alto-0.12)/2; g.add(fuste);
-  [[0.23,0.11,0.20,0.055],[0.18,0.07,0.18,0.14],
-   [0.20,0.055,0.19,arranque-0.12],[0.29,0.09,0.23,arranque-0.045],
-   [0.35,0.105,0.26,arranque+0.055],[0.24,0.06,0.21,arranque+0.14],
-   [0.25,0.08,0.22,alto-0.04]].forEach(function(d){
-    var pieza=new THREE.Mesh(new THREE.BoxGeometry(d[0],d[1],d[2]),MAT.mudejarFloral);
-    pieza.position.y=d[3]; g.add(pieza);
-  });
+  var g=new THREE.Group(), niveles=[0,0.11,0.18,arranque-0.15,arranque-0.10,arranque+0.13,arranque+0.18,alto-0.08,alto];
+  var anchos=[0.115,0.115,0.075,0.075,0.175,0.175,0.075,0.125,0.125];
+  var perfil=new THREE.Shape(), i;
+  perfil.moveTo(-anchos[0],niveles[0]);
+  for(i=1;i<niveles.length;i++) perfil.lineTo(-anchos[i],niveles[i]);
+  for(i=niveles.length-1;i>=0;i--) perfil.lineTo(anchos[i],niveles[i]);
+  perfil.closePath();
+  var geoCol=new THREE.ExtrudeGeometry(perfil,{depth:0.16,bevelEnabled:true,bevelThickness:0.01,bevelSize:0.01,bevelSegments:1});
+  geoCol.translate(0,0,-0.08);
+  g.add(new THREE.Mesh(geoCol,MAT.mudejarFloral));
   // Pequeño rombo dorado en el frente del capitel intermedio.
   var rombo=new THREE.Mesh(new THREE.BoxGeometry(0.075,0.075,0.018),MAT.oro);
   rombo.position.set(0,arranque+0.055,0.145); rombo.rotation.z=Math.PI/4; g.add(rombo);
@@ -808,17 +815,25 @@ function portadasPalcosPlatea(escena,borde,plan,ini,fin,nCeldas,yBase){
 
     // Dientes del intradós, ligeramente separados para leer bien la
     // silueta lobulada incluso desde el patio.
+    var cantidadDientes=Math.floor((ptsArco.length-4)/2);
+    var geoDiente=new THREE.ConeGeometry(0.060,0.14,3);
+    var dientes=new THREE.InstancedMesh(geoDiente,MAT.mudejarArcos,cantidadDientes);
+    var matrizD=new THREE.Matrix4(), quatD=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI);
+    var escalaD=new THREE.Vector3(1,1,1), posD=new THREE.Vector3(), nd=0;
     for(var di=2;di<ptsArco.length-2;di+=2){
-      var diente=new THREE.Mesh(new THREE.ConeGeometry(0.060,0.14,3),MAT.mudejarArcos);
-      diente.position.set(ptsArco[di].x,ptsArco[di].y-0.105,0.015);
-      diente.rotation.z=Math.PI; grupo.add(diente);
+      posD.set(ptsArco[di].x,ptsArco[di].y-0.105,0.015);
+      matrizD.compose(posD,quatD,escalaD); dientes.setMatrixAt(nd++,matrizD);
     }
+    dientes.instanceMatrix.needsUpdate=true; grupo.add(dientes);
     // Detalle geométrico repetido en el paño superior.
+    var geoAdorno=new THREE.BoxGeometry(0.075,0.075,0.022);
+    var adornos=new THREE.InstancedMesh(geoAdorno,MAT.oro,5);
+    var matrizA=new THREE.Matrix4(), quatA=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/4);
     for(var oi=1;oi<=5;oi++){
-      var adorno=new THREE.Mesh(new THREE.BoxGeometry(0.075,0.075,0.022),MAT.oro);
-      adorno.position.set(-ancho/2+ancho*oi/6,altoTecho-0.15,-0.145);
-      adorno.rotation.z=Math.PI/4; grupo.add(adorno);
+      matrizA.compose(new THREE.Vector3(-ancho/2+ancho*oi/6,altoTecho-0.15,-0.145),quatA,escalaD);
+      adornos.setMatrixAt(oi-1,matrizA);
     }
+    adornos.instanceMatrix.needsUpdate=true; grupo.add(adornos);
 
     [-1,1].forEach(function(lado){
       var cortina=new THREE.Mesh(geometriaCortinaPalco(ancho,altoTotal,lado),MAT.telon);
@@ -863,26 +878,31 @@ function antepalcosPlatea(escena,plan,ini,fin,nCeldas,yBase){
     escena.add(cinta([plan[ic],exterior[ic]],yBase,P.pisos[1].y,MAT.maderaPlatea));
   }
 
-  // Una puerta de acceso centrada en el cerramiento posterior de cada celda.
+  // Puertas instanciadas: una hoja, dos jambas y un dintel por celda se
+  // resuelven en solo tres draw calls para todo el tramo.
+  var matsPuerta=[MAT.maderaButaca,MAT.maderaButaca,MAT.maderaButaca,
+                  MAT.maderaButaca,MAT.puertaPalco,MAT.maderaButaca];
+  var hojas=new THREE.InstancedMesh(new THREE.BoxGeometry(0.82,1.92,0.07),matsPuerta,nCeldas);
+  var marcos=new THREE.InstancedMesh(new THREE.BoxGeometry(0.09,2.05,0.11),MAT.mudejarFloral,nCeldas*2);
+  var dinteles=new THREE.InstancedMesh(new THREE.BoxGeometry(1.01,0.12,0.12),MAT.mudejarArcos,nCeldas);
+  var matriz=new THREE.Matrix4(), quat=new THREE.Quaternion(), ejeY=new THREE.Vector3(0,1,0);
+  var escala=new THREE.Vector3(1,1,1), pos=new THREE.Vector3(), nMarco=0;
   for(k=0;k<nCeldas;k++){
     var i=Math.round((idx[k]+idx[k+1])/2), q=exterior[i];
     var a=exterior[Math.max(ini,i-1)], b=exterior[Math.min(fin,i+1)];
-    // La textura completa de la puerta se usa solo en la cara frontal;
-    // los cantos conservan madera lisa para no deformar sus paneles.
-    var matsPuerta=[MAT.maderaButaca,MAT.maderaButaca,MAT.maderaButaca,
-                    MAT.maderaButaca,MAT.puertaPalco,MAT.maderaButaca];
-    var puerta=new THREE.Group(), hoja=new THREE.Mesh(new THREE.BoxGeometry(0.82,1.92,0.07),matsPuerta);
-    hoja.position.y=0.96; puerta.add(hoja);
+    var angulo=-Math.atan2(b.z-a.z,b.x-a.x), cs=Math.cos(angulo), sn=Math.sin(angulo);
+    quat.setFromAxisAngle(ejeY,angulo);
+    pos.set(q.x,yBase(q)+0.96,q.z); matriz.compose(pos,quat,escala); hojas.setMatrixAt(k,matriz);
     [-1,1].forEach(function(lado){
-      var marco=new THREE.Mesh(new THREE.BoxGeometry(0.09,2.05,0.11),MAT.mudejarFloral);
-      marco.position.set(lado*0.46,1.025,0.015); puerta.add(marco);
+      var lx=lado*0.46,lz=0.015;
+      pos.set(q.x+cs*lx+sn*lz,yBase(q)+1.025,q.z-sn*lx+cs*lz);
+      matriz.compose(pos,quat,escala); marcos.setMatrixAt(nMarco++,matriz);
     });
-    var dintel=new THREE.Mesh(new THREE.BoxGeometry(1.01,0.12,0.12),MAT.mudejarArcos);
-    dintel.position.set(0,2.04,0.015); puerta.add(dintel);
-    puerta.position.set(q.x,yBase(q),q.z);
-    puerta.rotation.y=-Math.atan2(b.z-a.z,b.x-a.x);
-    escena.add(puerta);
+    pos.set(q.x+sn*0.015,yBase(q)+2.04,q.z+cs*0.015);
+    matriz.compose(pos,quat,escala); dinteles.setMatrixAt(k,matriz);
   }
+  hojas.instanceMatrix.needsUpdate=true; marcos.instanceMatrix.needsUpdate=true; dinteles.instanceMatrix.needsUpdate=true;
+  escena.add(hojas); escena.add(marcos); escena.add(dinteles);
 }
 
 /* ---------------- MONTAJE ----------------------------------------- */

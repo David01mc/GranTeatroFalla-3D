@@ -5,8 +5,12 @@ var FALLA = window.FALLA;
 var escena, camara, render, reloj;
 
 function iniciar(){
-  render=new THREE.WebGLRenderer({antialias:true, logarithmicDepthBuffer:true});
-  render.setPixelRatio(Math.min(devicePixelRatio,2));
+  // La escena no necesita profundidad logarítmica (su escala es menor de
+  // 100 m). Desactivarla recupera el early-Z de la GPU. Limitar el DPR
+  // evita renderizar cuatro veces más píxeles en pantallas Retina.
+  render=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+  var pixelRatioMax=innerWidth<700 ? 1.25 : 1.5;
+  render.setPixelRatio(Math.min(devicePixelRatio,pixelRatioMax));
   render.setSize(innerWidth, innerHeight);
   document.body.appendChild(render.domElement);
 
