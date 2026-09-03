@@ -101,19 +101,12 @@ var LATERAL_DENTRO = CENTRO_MEDIO + PASILLO_CENTRAL;             // borde interi
 
 function zFila(i){ return Z_FILA1 + i*FILA_PASO; }
 
-/* Cada butaca se apunta a una "variante" de tapizado/madera al azar
-   (ver variantesMaterial() en materiales.js): así, aunque compartan la
-   misma geometría, no todas lucen exactamente el mismo tono ni la
-   misma orientación de veta/textura. */
-var N_VARIANTES_BUTACA = MAT.terciopeloButaca.length;
-function variante(){ return Math.floor(Math.random()*N_VARIANTES_BUTACA); }
-
 /* Los 9x16 asientos del bloque central. */
 function sitiosCentro(){
   var out=[];
   for(var i=0;i<FILAS_CENTRO;i++){
     var z=zFila(i);
-    for(var c=0;c<ASIENTOS_CENTRO;c++) out.push({x:(c-(ASIENTOS_CENTRO-1)/2)*ASIENTO_PASO, z:z, v:variante()});
+    for(var c=0;c<ASIENTOS_CENTRO;c++) out.push({x:(c-(ASIENTOS_CENTRO-1)/2)*ASIENTO_PASO, z:z});
   }
   return out;
 }
@@ -130,7 +123,7 @@ function sitiosLateral(signo){
       // salvaguarda: si esta butaca dejase menos del pasillo lateral mínimo
       // hasta el muro real, se omite en vez de solaparse con la pared.
       if(geo.distAPlanta(x,z) < PASILLO_LATERAL) continue;
-      out.push({x:x, z:z, v:variante()});
+      out.push({x:x, z:z});
     }
   }
   return out;
@@ -226,8 +219,6 @@ function butacas(){
   var GROSOR_BRAZO=0.07, X_BRAZO=ASIENTO_PASO/2-0.035; // deja un pequeño hueco entre butacas vecinas
   var yFilete=ALTO_BRAZO+0.005;
 
-  // Geometrías, ya con su translate aplicado: se reutilizan tal cual
-  // para cada variante (solo cambia el material, no la forma).
   var geoRespaldo=new THREE.ExtrudeGeometry(perfilRespaldo(0.46,0.56,0.19),
     {depth:0.10, bevelEnabled:false, curveSegments:10});
   geoRespaldo.translate(0,0.50,0.15);
@@ -245,38 +236,32 @@ function butacas(){
   var geoFileteI=new THREE.BoxGeometry(GROSOR_BRAZO+0.015,0.025,0.14); geoFileteI.translate(-X_BRAZO,yFilete,0.16);
   var geoFileteD=new THREE.BoxGeometry(GROSOR_BRAZO+0.015,0.025,0.14); geoFileteD.translate(X_BRAZO,yFilete,0.16);
 
+  // Todas las butacas son iguales: un único material de terciopelo y
+  // uno de madera para las 326 (8 draw calls en total, no una por butaca).
+  var piezas=[
+    {g:geoRespaldoMadera, m:MAT.maderaButaca},
+    {g:geoRespaldo,       m:MAT.terciopeloButaca},
+    {g:geoCojin,          m:MAT.terciopeloButaca},
+    {g:geoBase,           m:MAT.maderaButaca},
+    {g:geoBrazoI,         m:MAT.maderaButaca},
+    {g:geoBrazoD,         m:MAT.maderaButaca},
+    {g:geoFileteI,        m:MAT.oro},
+    {g:geoFileteD,        m:MAT.oro}
+  ];
+
   var grupo=new THREE.Group(), m4=new THREE.Matrix4(), q=new THREE.Quaternion(),
       pos3=new THREE.Vector3(), esc=new THREE.Vector3(1,1,1);
 
-  function instanciar(geometria, material, lista){
-    if(!lista.length) return;
-    var im=new THREE.InstancedMesh(geometria, material, lista.length);
-    for(var i=0;i<lista.length;i++){
-      var s=lista[i];
+  piezas.forEach(function(p){
+    var im=new THREE.InstancedMesh(p.g, p.m, sitios.length);
+    for(var i=0;i<sitios.length;i++){
+      var s=sitios[i];
       pos3.set(s.x, geo.rake(s.z), s.z);
       m4.compose(pos3,q,esc); // q = identidad: todas las butacas miran hacia el escenario
       im.setMatrixAt(i,m4);
     }
     im.instanceMatrix.needsUpdate=true;
     grupo.add(im);
-  }
-
-  // El filete dorado no varía; el resto sí, agrupando cada butaca según
-  // la variante de tapizado/madera que le tocó en sitiosCentro/Lateral().
-  instanciar(geoFileteI, MAT.oro, sitios);
-  instanciar(geoFileteD, MAT.oro, sitios);
-
-  var porVariante=[], v;
-  for(v=0;v<N_VARIANTES_BUTACA;v++) porVariante.push([]);
-  sitios.forEach(function(s){ porVariante[s.v].push(s); });
-
-  porVariante.forEach(function(lista, v){
-    instanciar(geoRespaldoMadera, MAT.maderaButaca[v], lista);
-    instanciar(geoRespaldo, MAT.terciopeloButaca[v], lista);
-    instanciar(geoCojin,    MAT.terciopeloButaca[v], lista);
-    instanciar(geoBase,     MAT.maderaButaca[v], lista);
-    instanciar(geoBrazoI,   MAT.maderaButaca[v], lista);
-    instanciar(geoBrazoD,   MAT.maderaButaca[v], lista);
   });
 
   return grupo;
@@ -489,6 +474,28 @@ function lampara(){
   return g;
 }
 
+/* Tabiques de separación entre palcos: postes de yeso cada cierto nº de
+   puntos del borde, entre los índices [ini,fin] (ambos de "borde" y de
+   "geo.PLAN", que comparten índice punto a punto). yBase da la altura
+   del suelo del palco en cada punto (constante en los pisos altos, y
+   siguiendo la pendiente del patio en la platea). */
+function separadoresPalco(escena, borde, plan, ini, fin, n, yBase, alto){
+  if(n<2 || fin<=ini) return;
+  // n-1 tabiques repartidos a partes iguales entre ini y fin: así el
+  // tramo queda dividido en exactamente n palcos, sin el redondeo que
+  // arrastraría un "paso" fijo (que puede dejar un palco de más o de
+  // menos según el resto de la división).
+  for(var k=1;k<n;k++){
+    var i=Math.round(ini + k*(fin-ini)/n);
+    var p=borde[i], q=plan[i];
+    var y0=(typeof yBase==='function')?yBase(p):yBase;
+    var div=new THREE.Mesh(new THREE.BoxGeometry(0.16, alto+1.5, 1.5), MAT.yeso);
+    div.position.set((p.x*0.75+q.x*0.25), y0+(alto+1.5)/2, (p.z*0.75+q.z*0.25));
+    div.rotation.y=Math.atan2(q.x-p.x, q.z-p.z);
+    escena.add(div);
+  }
+}
+
 /* ---------------- MONTAJE ----------------------------------------- */
 function construir(escena){
   escena.background=new THREE.Color(0x0d0608);
@@ -512,15 +519,21 @@ function construir(escena){
       (n===0)?function(p){return geo.rake(p.z)+piso.alto+0.14;}:piso.y+piso.alto+0.14,
       MAT.oro));                                                          // moldura
 
-    if(piso.palcos){                                                      // separadores
-      var paso=Math.floor(borde.length/piso.palcos);
-      for(var i=paso;i<borde.length-1;i+=paso){
-        var p=borde[i], q=geo.PLAN[i];
-        var div=new THREE.Mesh(new THREE.BoxGeometry(0.16, piso.alto+1.5, 1.5), MAT.yeso);
-        div.position.set((p.x*0.75+q.x*0.25),(piso.y+(piso.alto+1.5)/2),(p.z*0.75+q.z*0.25));
-        div.rotation.y=Math.atan2(q.x-p.x, q.z-p.z);
-        escena.add(div);
-      }
+    if(piso.palcos){                                                      // separadores (todo el perímetro)
+      separadoresPalco(escena, borde, geo.PLAN, 0, borde.length-1, piso.palcos, piso.y, piso.alto);
+    }
+
+    if(n===0 && piso.palcosLado){
+      // Palcos de platea: solo en las dos alas laterales: el tramo central
+      // trasero (a la altura de los pasillos centrales, futuro palco de
+      // autoridades) se queda sin tabicar. geo.PLAN cruza x=±umbral cerca
+      // del fondo de la sala; se busca ese corte por simetría del arco.
+      var umbral=(CENTRO_MEDIO+LATERAL_DENTRO)/2, corteD=-1, ci;
+      for(ci=0; ci<geo.PLAN.length; ci++){ if(geo.PLAN[ci].x<=umbral){ corteD=ci; break; } }
+      var corteI=(geo.PLAN.length-1)-corteD;
+      var yBasePlatea=function(p){return geo.rake(p.z);};
+      separadoresPalco(escena, borde, geo.PLAN, 0, corteD, piso.palcosLado, yBasePlatea, piso.alto);
+      separadoresPalco(escena, borde, geo.PLAN, corteI, borde.length-1, piso.palcosLado, yBasePlatea, piso.alto);
     }
   });
 

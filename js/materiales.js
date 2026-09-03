@@ -11,32 +11,42 @@ function textura(ruta, repX, repY){
   t.repeat.set(repX, repY);
   return t;
 }
-var texParquet   = textura('Textures/Parquet.png', 14, 16);
-var texAlfombra  = textura('Textures/RedCarpet.png', 1, 1); // el largo se controla en el propio UV de la alfombra
-var texTelon     = textura('Textures/Telon.png', 1, 1);     // ídem: el UV de la cortina ya mete su propio repetido
+var texParquet      = textura('Textures/Parquet.png', 14, 16);
+var texAlfombra     = textura('Textures/RedCarpet.png', 1, 1); // el largo se controla en el propio UV de la alfombra
+var texTelon        = textura('Textures/Telon.png', 1, 1);     // ídem: el UV de la cortina ya mete su propio repetido
+var texMaderaButaca = textura('Textures/MaderaButaca.png', 1, 1);
 
-/* Varios materiales "gemelos" por textura (misma imagen, cada uno con su
-   propia rotación/desplazamiento de UV y un tono ligeramente distinto),
-   para que butacas vecinas no se vean todas exactamente iguales. */
-function variantesMaterial(ruta, n, rotMax, tonoMin, tonoMax){
-  var mats=[], i;
-  for(i=0;i<n;i++){
-    var t=cargador.load(ruta);
-    t.wrapS=t.wrapT=THREE.RepeatWrapping;
-    t.center.set(0.5,0.5);
-    t.rotation=(Math.random()*2-1)*rotMax;
-    t.offset.set(Math.random(), Math.random());
-    var tono=tonoMin+Math.random()*(tonoMax-tonoMin);
-    mats.push(new THREE.MeshLambertMaterial({map:t, color:new THREE.Color(tono,tono,tono)}));
-  }
-  return mats;
+/* Carga una textura y le rebaja la saturación (mezcla cada píxel hacia
+   su propio gris en el porcentaje indicado) antes de asignarla al
+   material — la foto del terciopelo de la butaca venía demasiado roja. */
+function texturaDesaturada(ruta, factor, material){
+  var img = new Image();
+  img.onload = function(){
+    var c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    var datos = ctx.getImageData(0, 0, c.width, c.height), d = datos.data;
+    for(var i=0; i<d.length; i+=4){
+      var gris = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+      d[i]   += (gris-d[i])  *factor;
+      d[i+1] += (gris-d[i+1])*factor;
+      d[i+2] += (gris-d[i+2])*factor;
+    }
+    ctx.putImageData(datos, 0, 0);
+    var t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    material.map = t;
+    material.needsUpdate = true;
+  };
+  img.src = ruta;
 }
-var matTercButaca   = variantesMaterial('Textures/TerciopeloButaca.png', 6, 0.20, 0.88, 1.10);
-var matMaderaButaca = variantesMaterial('Textures/MaderaButaca.png',     6, 0.15, 0.90, 1.08);
+var matTerciopeloButaca = new THREE.MeshLambertMaterial({color:new THREE.Color(0.90,1,1)});
+texturaDesaturada('Textures/TerciopeloButaca.png', 0.45, matTerciopeloButaca);
 
 var MAT = {
-  terciopeloButaca: matTercButaca, // array: una por variante, ver geometria.js
-  maderaButaca:     matMaderaButaca,
+  terciopeloButaca: matTerciopeloButaca,
+  maderaButaca:     new THREE.MeshLambertMaterial({map:texMaderaButaca}),
   suelo:      new THREE.MeshLambertMaterial({color:0x3a2118, side:THREE.DoubleSide}),
   parquet:    new THREE.MeshLambertMaterial({map:texParquet, side:THREE.DoubleSide}),
   alfombra:   new THREE.MeshLambertMaterial({map:texAlfombra, side:THREE.DoubleSide}),
@@ -50,11 +60,7 @@ var MAT = {
 };
 
 var lista=[];
-for(var k in MAT){
-  var v=MAT[k];
-  if(Array.isArray(v)) v.forEach(function(m){ lista.push(m); });
-  else lista.push(v);
-}
+for(var k in MAT) lista.push(MAT[k]);
 
 /* Materiales creados dinámicamente (texturas de canvas, etc.) se registran
    aquí para que el toggle de "modo boceto" también los ponga en wireframe. */
