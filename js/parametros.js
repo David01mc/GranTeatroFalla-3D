@@ -84,6 +84,6 @@ FALLA.geo = {
   dentroDePlanta: dentroDePlanta,
   distAPlanta: distAPlanta,
   // caja del suelo del escenario (ver geometria.js: escenario()) — la usa el modo paseo para pisar las tablas
-  escenario: {altura:1.05, mitadX:9, zFondo:-16, zFrente:0.3}
+  escenario: {altura:1.05, mitadX:9, zFondo:-17, zFrente:-0.7}
 };
 })();

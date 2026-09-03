@@ -25,16 +25,19 @@ function cinta(pts, yb, yt, mat){
 
 /* Banda horizontal entre dos polilíneas (suelos de palco, cornisas). */
 function banda(pA, pB, yA, yB, mat){
-  var g=new THREE.BufferGeometry(), pos=[], idx=[], i;
+  var g=new THREE.BufferGeometry(), pos=[], uv=[], idx=[], i, dist=0;
   for(i=0;i<pA.length;i++){
     var a=pA[i], b=pB[i];
+    if(i>0) dist+=Math.hypot(a.x-pA[i-1].x,a.z-pA[i-1].z);
     pos.push(a.x,(typeof yA==='function')?yA(a):yA,a.z, b.x,(typeof yB==='function')?yB(b):yB,b.z);
+    uv.push(dist*0.5,0, dist*0.5,Math.hypot(b.x-a.x,b.z-a.z)*0.5);
   }
   for(i=0;i<pA.length-1;i++){
     var o=i*2;
     idx.push(o,o+1,o+2, o+1,o+3,o+2);
   }
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv,2));
   g.setIndex(idx); g.computeVertexNormals();
   return new THREE.Mesh(g,mat);
 }
@@ -112,6 +115,7 @@ var LATERAL_DENTRO = CENTRO_MEDIO + PASILLO_CENTRAL;             // borde interi
 // geometria.js).
 var ANCHO_FRONTAL = 2.5;
 var DESPLAZAMIENTO_FRONTAL_X = 3.0; // 3 m hacia atrás de cada palco, hacia el muro lateral
+var RETIRO_ESCENARIO_Z = 1.0;       // espacio adicional reservado delante para el foso
 var Z_CORREDOR_FIN = Z_FILA1-0.6, Z_CORREDOR_INI = Z_CORREDOR_FIN-PASILLO_CENTRAL;
 
 /* Fondo y frente (en X, lado derecho) del Palco Frontal. Devuelve los
@@ -364,6 +368,9 @@ function embocadura(){
   geom.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
   geom.setIndex(idx); geom.computeVertexNormals();
   g.add(new THREE.Mesh(geom, MAT.oro));
+  // La embocadura acompaña al escenario retirado para que el arco de
+  // herradura siga definiendo correctamente la nueva boca escénica.
+  g.position.z=-RETIRO_ESCENARIO_Z;
   return g;
 }
 
@@ -479,7 +486,19 @@ function escenario(){
   juegoTelon(g, -10.4,  9.5,  8.4, 1.3, 4.7, 1.7); // segundo subtelón
   construirTelonFuncional(g);                       // telón de boca: éste es el que se abre y se cierra
 
+  // Se retira el conjunto completo, incluidos telones y fondo, para
+  // liberar delante una franja real destinada al foso de organización.
+  g.position.z=-RETIRO_ESCENARIO_Z;
   return g;
+}
+
+/* Suelo de la nueva franja entre la embocadura y el escenario retirado.
+   Continúa a nivel del patio y queda libre de butacas para organización
+   y fotografía. */
+function sueloFoso(){
+  var foso=new THREE.Mesh(new THREE.BoxGeometry(18,0.08,RETIRO_ESCENARIO_Z), MAT.suelo);
+  foso.position.set(0,0.04,-RETIRO_ESCENARIO_Z/2);
+  return foso;
 }
 
 /* ---------------- TECHO: alegoría del Paraíso --------------------- */
@@ -726,10 +745,16 @@ function construir(escena){
       // jamba quedaría oculto detrás del muro).
       var limFrontal=limitesFrontal();
       [-1,1].forEach(function(signo){
-        var xFondo=signo*(limFrontal.xFondo+DESPLAZAMIENTO_FRONTAL_X), xFrente=signo*(limFrontal.xFrente+DESPLAZAMIENTO_FRONTAL_X), zMed=Z_CORREDOR_INI/2;
-        var bF=[{x:xFrente,z:0},{x:xFrente,z:zMed},{x:xFrente,z:Z_CORREDOR_INI}];
-        var plF=[{x:xFondo,z:0},{x:xFondo,z:zMed},{x:xFondo,z:Z_CORREDOR_INI}];
-        escena.add(cinta(bF, function(p){return geo.rake(p.z);}, yFrontal, MAT.maderaButaca)); // peana
+        var zInicio=-RETIRO_ESCENARIO_Z, zMed=(zInicio+Z_CORREDOR_INI)/2;
+        var xFondo=signo*(limFrontal.xFondo+DESPLAZAMIENTO_FRONTAL_X), xFrente=signo*(limFrontal.xFrente+DESPLAZAMIENTO_FRONTAL_X);
+        var bF=[{x:xFrente,z:zInicio},{x:xFrente,z:zMed},{x:xFrente,z:Z_CORREDOR_INI}];
+        var plF=[{x:xFondo,z:zInicio},{x:xFondo,z:zMed},{x:xFondo,z:Z_CORREDOR_INI}];
+        // Base cerrada del palco frontal: frente, trasera y testeros bajan
+        // hasta el suelo para que la pieza no parezca suspendida.
+        escena.add(cinta(bF, function(p){return geo.rake(p.z);}, yFrontal, MAT.maderaPlatea));
+        escena.add(cinta(plF, function(p){return geo.rake(p.z);}, yFrontal, MAT.maderaPlatea));
+        escena.add(cinta([bF[0],plF[0]], function(p){return geo.rake(p.z);}, yFrontal, MAT.maderaPlatea));
+        escena.add(cinta([bF[bF.length-1],plF[plF.length-1]], function(p){return geo.rake(p.z);}, yFrontal, MAT.maderaPlatea));
         barandillaPalco(escena, bF, yFrontal, ALTURA_BARANDILLA_PLATEA);
         escena.add(banda(bF, plF, function(){return ALTURA_FRONTAL+piso.alto;}, function(){return ALTURA_FRONTAL+piso.alto;}, MAT.hueco));
         escena.add(banda(bF, plF, yFrontal, yFrontal, MAT.suelo));
@@ -750,6 +775,15 @@ function construir(escena){
       // desnivel entre el suelo inclinado del patio y la cota horizontal
       // de los palcos, evitando que estos parezcan suspendidos.
       escena.add(cinta(bAla, function(p){return geo.rake(p.z);}, yPiso, MAT.maderaPlatea));
+      // Moldura cilíndrica en la junta entre el muro portante y la valla.
+      // Sigue toda la herradura y oculta el encuentro entre ambos planos.
+      var curvaRemate=new THREE.CatmullRomCurve3(bAla.map(function(p){
+        return new THREE.Vector3(p.x,ALTURA_PLATEA+0.07,p.z);
+      }));
+      // El diámetro cubre por completo los 12 cm del zócalo rojo situado
+      // detrás, evitando que asome o produzca parpadeo por solapamiento.
+      var geoRemate=new THREE.TubeGeometry(curvaRemate,Math.max(48,bAla.length*2),0.075,10,false);
+      escena.add(new THREE.Mesh(geoRemate,MAT.barnizClaro));
       barandillaPalco(escena, bAla, yPiso, ALTURA_BARANDILLA_PLATEA);
       // Trasdós: misma forma que la herradura pero más retranqueado (más
       // cerca del muro real), para que el ala tenga volumen real y no
@@ -758,7 +792,7 @@ function construir(escena){
       escena.add(cinta(trasdos, function(p){return geo.rake(p.z);}, yPiso, MAT.maderaPlatea));
       escena.add(cinta([bAla[0],trasdos[0]], function(p){return geo.rake(p.z);}, yPiso, MAT.maderaPlatea));
       escena.add(cinta([bAla[bAla.length-1],trasdos[trasdos.length-1]], function(p){return geo.rake(p.z);}, yPiso, MAT.maderaPlatea));
-      escena.add(banda(bAla, plAla, yPiso, yPiso, MAT.suelo));
+      escena.add(banda(bAla, plAla, yPiso, yPiso, MAT.parquetPlatea));
       escena.add(cinta(bAla, function(){return ALTURA_PLATEA+ALTURA_BARANDILLA_PLATEA;}, function(){return ALTURA_PLATEA+ALTURA_BARANDILLA_PLATEA+0.035;}, MAT.terciopelo2));
 
       separadoresPalco(escena, borde, geo.PLAN, iAlaD, corteD, piso.palcosLado, yPiso, piso.alto);
@@ -777,6 +811,7 @@ function construir(escena){
   escena.add(butacas());
   escena.add(pasillosPatio());
   escena.add(embocadura());
+  escena.add(sueloFoso());
   escena.add(escenario());
 
   // Techo con la alegoría.
@@ -801,7 +836,7 @@ function construir(escena){
   var limFrontalLuz=limitesFrontal();
   [-1,1].forEach(function(signo){
     var focoFrontal=new THREE.PointLight(0xffcf9a, 0.55, 12);
-    focoFrontal.position.set(signo*((limFrontalLuz.xFondo+limFrontalLuz.xFrente)/2+DESPLAZAMIENTO_FRONTAL_X), 2.6, Z_CORREDOR_INI/2);
+    focoFrontal.position.set(signo*((limFrontalLuz.xFondo+limFrontalLuz.xFrente)/2+DESPLAZAMIENTO_FRONTAL_X), 2.6, (Z_CORREDOR_INI-RETIRO_ESCENARIO_Z)/2);
     escena.add(focoFrontal);
   });
 

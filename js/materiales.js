@@ -12,12 +12,14 @@ function textura(ruta, repX, repY){
   return t;
 }
 var texParquet      = textura('Textures/Parquet.png', 14, 16);
+var texParquetPlatea= textura('Textures/Parquet.png', 1, 1);
 var texAlfombra     = textura('Textures/RedCarpet.png', 1, 1); // el largo se controla en el propio UV de la alfombra
 var texTelon        = textura('Textures/Telon.png', 1, 1);     // ídem: el UV de la cortina ya mete su propio repetido
 var texMaderaButaca = textura('Textures/MaderaButaca.png', 1, 1);
 var texMaderaBlanca = textura('Textures/MaderaBlanca.png', 1, 1);
 var texMaderaPlatea = textura('Textures/MaderaPlateaInferior.png', 1, 1);
 var texTerciopelo2  = textura('Textures/TerciopeloButaca2.png', 1, 1);
+var texBarnizClaro  = textura('Textures/BarnizBlancoClaraHuevo.png', 18, 1);
 
 /* Carga una textura y le rebaja la saturación (mezcla cada píxel hacia
    su propio gris en el porcentaje indicado) antes de asignarla al
@@ -55,8 +57,10 @@ var MAT = {
   maderaBlanca:     new THREE.MeshLambertMaterial({map:texMaderaBlanca, color:0xb0a99b, side:THREE.DoubleSide}),
   maderaPlatea:     new THREE.MeshLambertMaterial({map:texMaderaPlatea, side:THREE.DoubleSide}),
   terciopelo2:      new THREE.MeshLambertMaterial({map:texTerciopelo2, side:THREE.DoubleSide}),
+  barnizClaro:      new THREE.MeshLambertMaterial({map:texBarnizClaro, color:0x8f8a80}),
   suelo:      new THREE.MeshLambertMaterial({color:0x3a2118, side:THREE.DoubleSide}),
   parquet:    new THREE.MeshLambertMaterial({map:texParquet, side:THREE.DoubleSide}),
+  parquetPlatea:new THREE.MeshLambertMaterial({map:texParquetPlatea, side:THREE.DoubleSide}),
   // polygonOffset empuja la alfombra hacia la cámara en el buffer de
   // profundidad (no en el mundo): el pequeño y+0.06 de alfombra() ya no
   // basta él solo para evitar el parpadeo/hundimiento con el parquet al
