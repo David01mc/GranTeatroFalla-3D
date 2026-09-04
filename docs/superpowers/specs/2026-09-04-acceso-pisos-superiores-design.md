@@ -17,6 +17,20 @@ Esta spec cubre añadir acceso real a pie a las plantas **principal** y
 plantas el sistema de antepalco+corredor+puertas que ya existe en platea.
 El paraíso (y=9.60, sin palcos, `piso.palcos:0`) queda fuera de alcance.
 
+**Nota (actualizada tras el brainstorming):** entre el momento de escribir
+esta spec y hoy se ha añadido, fuera de este proceso, un sistema distinto
+que también da acceso al corredor de platea: dos rampas traseras
+(`RAMPAS_TRASERAS` en `parametros.js`) que prolongan los pasillos de
+alfombra central del patio hasta la cota del corredor, y un "fondo técnico"
+de cinco arcos (`fondoTecnicoPlatea` en `geometria.js`, dos arcos de salida
+en los extremos y tres cabinas técnicas centrales) en el muro trasero de la
+platea. Este sistema resuelve el acceso **al patio y a platea únicamente**,
+en el eje central trasero (x≈±3.4, z≈23-29); no sustituye ni entra en
+conflicto con las escaleras traseras de esta spec, que se sitúan en la zona
+lateral (x≈18-19, junto a `salidasEscalerasPasillo`) y sirven para subir a
+principal y segundo. Los dos planos de la sección "Planos esquemáticos"
+reflejan ambos sistemas ya coexistiendo.
+
 ## Objetivo y criterio de éxito
 
 Desde el modo paseo, un usuario debe poder: subir las escaleras traseras
@@ -163,6 +177,77 @@ three.js dependiente de WebGL). Verificación manual en navegador:
    este cambio.
 6. Comprobar que las escaleras laterales existentes, el corredor de
    platea y sus puertas siguen funcionando exactamente igual (regresión).
+
+## Planos esquemáticos
+
+Diagramas topológicos (no a escala ni con la curvatura real de la
+herradura): sirven para situar unas piezas respecto a otras, no para sacar
+medidas. Cotas en metros, tomadas de `parametros.js`/`geometria.js`.
+
+### Vista cenital — planta baja (patio + platea)
+
+```
+                              ESCENARIO
+                 (embocadura arco rebajado + foso, z<0)
+z=0    ═══════════════════════════════════════════════════════════
+                    │                            │
+          PALCO FRONTAL                   PALCO FRONTAL
+          (x≈-9..-11)                     (x≈9..11)
+z=1.8  ── ┴─── antepalco / pasillo transversal ───┴ ─────────────
+z=3.0   ┌───┐                                          ┌───┐
+        │ E │◄─ salida x=18.65    salida x=18.65 ─►│ E │
+        │ L │  escalera lateral                      │ L │
+        └─┬─┘  (patio→platea, +1.05 m)                └─┬─┘
+          │                                              │
+          │   NUEVA escalera trasera (zigzag)            │   NUEVA escalera
+          │   pegada al muro exterior, x≈18-19           │   trasera (ídem,
+          │     rellano 1 → PRINCIPAL (y=4.10)           │   lado espejo)
+          │     rellano 2 → SEGUNDO  (y=6.70)            │
+          │                                              │
+          │            PATIO DE BUTACAS                  │
+          │        (21 filas, pendiente 3 cm/m)           │
+          │                                              │
+          │     ┆pasillo┆  bloque   ┆pasillo┆             │
+          │     ┆ x=-3.4┆  central  ┆ x=3.4 ┆             │
+          │     ┆       ┆  (9 but.) ┆       ┆             │
+z≈23-28.6 │     └─rampa──┘         └──rampa─┘             │
+          │        (sube a la cota de platea, y≈1.22)     │
+z=29.4 ───┴───┬────────┬────────┬────────┬────────┬───────┴──────
+          │arco│ │ cabina │ │ cabina │ │ cabina │ │arco│
+          │sal.│ │técnica │ │técnica │ │técnica │ │sal.│
+          └────┘ └────────┘ └────────┘ └────────┘ └────┘
+                  FONDO TÉCNICO (5 arcos, muro trasero de platea,
+                  ya construido — fondoTecnicoPlatea())
+```
+
+### Vista lateral — sección por una escalera trasera (x≈18-19)
+
+```
+y (m)                                                (fuera de alcance)
+13.40 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄  techo (Abárzuza)
+
+ 9.60 ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌  paraíso (fuera)
+                                                ┌──────────┐
+ 7.80 ─────────────────────────────────────────┤ SEGUNDO  │ antepecho
+                                          ┌─────┤ (y=6.70) │ (6.70+1.10)
+ 6.70 ──────────────────────────── rellano┘     └──────────┘
+                              ╱‾‾ 2º tramo (zigzag "segundo")
+                          ╱‾‾
+                      ╱‾‾ 1er tramo
+ 5.25 ─────────────────────────┐                  antepecho
+                                │ PRINCIPAL         (4.10+1.15)
+ 4.10 ─────────────────── rellano  (y=4.10)
+                     ╱‾‾ 2º tramo (zigzag "principal")
+                 ╱‾‾
+             ╱‾‾ 1er tramo, arranca junto al muro exterior
+ 1.22 ──┴──────────────────────────────────────────────── corredor platea
+        (misma cota que llega la rampa trasera del plano cenital)
+ 0.65 ╲___
+         ╲______            patio (pendiente 3 cm/m, sube hacia el fondo)
+ 0.05        ╲_________________________________
+        z=0            z≈24 (última fila)     z≈29.4 (muro trasero)
+      (escenario)
+```
 
 ## Fuera de alcance
 
