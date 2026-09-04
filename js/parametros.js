@@ -46,15 +46,26 @@ var PLAN = planta();
 /* Dos escaleras simétricas en el hueco transversal entre el palco
    frontal y el primer palco de platea. Suben desde el pasillo hacia el
    lateral (eje X), nunca en dirección al escenario. */
-var ESCALERAS_LATERALES={centroZ:2.50,ancho:1.20,xBajo:7.00,xAlto:9.00,altura:1.05,peldanos:7};
+var ESCALERAS_LATERALES={centroZ:2.95,curvaZ:0.25,ancho:2.30,xBajo:10.25,xAlto:12.25,altura:1.05,peldanos:7};
+
+function centroZEscalera(e,t){ return e.centroZ+e.curvaZ*Math.sin(Math.PI*t); }
 
 function alturaEscaleraLateral(x,z){
   var e=ESCALERAS_LATERALES;
   var ax=Math.abs(x);
-  if(Math.abs(z-e.centroZ)>e.ancho/2 || ax<e.xBajo || ax>e.xAlto) return null;
-  var avance=(ax-e.xBajo)/(e.xAlto-e.xBajo);
-  var escalon=Math.max(0,Math.min(e.peldanos,Math.ceil(avance*e.peldanos)));
-  return e.altura*escalon/e.peldanos;
+  if(ax<e.xBajo || ax>e.xAlto) return null;
+  // Comprueba el rectángulo orientado de cada peldaño, siguiendo la
+  // misma polilínea curva que usa la geometría visible.
+  for(var i=e.peldanos-1;i>=0;i--){
+    var t0=i/e.peldanos,t1=(i+1)/e.peldanos;
+    var x0=e.xBajo+(e.xAlto-e.xBajo)*t0, x1=e.xBajo+(e.xAlto-e.xBajo)*t1;
+    var z0=centroZEscalera(e,t0),z1=centroZEscalera(e,t1);
+    var vx=x1-x0,vz=z1-z0,wx=ax-x0,wz=z-z0,L2=vx*vx+vz*vz;
+    var longitudinal=(wx*vx+wz*vz)/L2;
+    var lateral=Math.abs(vx*wz-vz*wx)/Math.sqrt(L2);
+    if(longitudinal>=-0.02 && longitudinal<=1.02 && lateral<=e.ancho/2) return e.altura*(i+1)/e.peldanos;
+  }
+  return null;
 }
 
 /* Desplaza la planta hacia dentro d metros (para pisos y antepechos). */

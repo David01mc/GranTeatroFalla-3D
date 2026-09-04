@@ -497,12 +497,15 @@ function escenario(){
    visibles debajo de la escalera. */
 function escalerasLaterales(){
   var g=new THREE.Group(), e=geo.escalerasLaterales;
-  var fondo=(e.xAlto-e.xBajo)/e.peldanos;
   [-1,1].forEach(function(signo){
     for(var i=0;i<e.peldanos;i++){
-      var alto=e.altura*(i+1)/e.peldanos;
-      var pel=new THREE.Mesh(new THREE.BoxGeometry(fondo+0.012,alto,e.ancho),MAT.maderaPlatea);
-      pel.position.set(signo*(e.xBajo+(i+0.5)*fondo),alto/2,e.centroZ);
+      var t0=i/e.peldanos,t1=(i+1)/e.peldanos;
+      var x0=e.xBajo+(e.xAlto-e.xBajo)*t0,x1=e.xBajo+(e.xAlto-e.xBajo)*t1;
+      var z0=e.centroZ+e.curvaZ*Math.sin(Math.PI*t0),z1=e.centroZ+e.curvaZ*Math.sin(Math.PI*t1);
+      var dx=signo*(x1-x0),dz=z1-z0,largo=Math.hypot(dx,dz),alto=e.altura*(i+1)/e.peldanos;
+      var pel=new THREE.Mesh(new THREE.BoxGeometry(largo+0.012,alto,e.ancho),MAT.maderaPlatea);
+      pel.position.set(signo*(x0+x1)/2,alto/2,(z0+z1)/2);
+      pel.rotation.y=-Math.atan2(dz,dx);
       g.add(pel);
     }
   });
