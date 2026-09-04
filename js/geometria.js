@@ -64,6 +64,41 @@ function alfombra(pts, ancho, mat){
   return new THREE.Mesh(g,mat);
 }
 
+/* Variante con un ancho distinto en cada punto, usada para ensanchar
+   suavemente el pasillo transversal al llegar a las escaleras. */
+function alfombraVariable(pts,anchos,mat){
+  var g=new THREE.BufferGeometry(),pos=[],uv=[],idx=[],dist=0;
+  for(var i=0;i<pts.length;i++){
+    var p=pts[i],a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)];
+    var tx=b.x-a.x,tz=b.z-a.z,L=Math.hypot(tx,tz)||1;tx/=L;tz/=L;
+    var nx=-tz,nz=tx,w=anchos[i]/2,y=geo.rake(p.z)+0.08;
+    pos.push(p.x-nx*w,y,p.z-nz*w,p.x+nx*w,y,p.z+nz*w);
+    if(i>0)dist+=Math.hypot(p.x-pts[i-1].x,p.z-pts[i-1].z);
+    uv.push(0,dist*0.6,1,dist*0.6);
+  }
+  for(i=0;i<pts.length-1;i++){var o=i*2;idx.push(o,o+1,o+2,o+1,o+3,o+2);}
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  g.setIndex(idx);g.computeVertexNormals();
+  return new THREE.Mesh(g,mat);
+}
+
+/* Trapecio de enlace cuyos testeros permanecen paralelos al borde del
+   pasillo y al primer escalón, aunque sus centros no estén alineados. */
+function enlaceAlfombra(x0,z0,w0,x1,z1,w1,mat){
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute([
+    x0,geo.rake(z0-w0/2)+0.085,z0-w0/2,
+    x0,geo.rake(z0+w0/2)+0.085,z0+w0/2,
+    x1,geo.rake(z1-w1/2)+0.085,z1-w1/2,
+    x1,geo.rake(z1+w1/2)+0.085,z1+w1/2
+  ],3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute([0,0,1,0,0,1,1,1],2));
+  g.setIndex([0,1,2,1,3,2]);
+  g.computeVertexNormals();
+  return new THREE.Mesh(g,mat);
+}
+
 /* Superficie de la planta (patio / techo), con la pendiente ya aplicada. */
 function superficie(pts, yFn, mat, conUV){
   var forma=new THREE.Shape();
@@ -202,7 +237,9 @@ geo.enBloqueAsientos = enBloqueAsientos;
    hueco tiene que ser generoso, no solo simbólico. */
 function pasillosPatio(){
   var g=new THREE.Group();
-  var zIni=Z_FILA1-0.6, zFin=zFila(FILAS_CENTRO-1)+0.6;
+  // Entra 10 cm bajo la alfombra transversal: al estar el patio en
+  // pendiente, una junta exacta dejaba asomar una línea de parquet.
+  var zIni=Z_FILA1-0.70, zFin=zFila(FILAS_CENTRO-1)+0.6;
   var cx = (CENTRO_MEDIO+LATERAL_DENTRO)/2;
   var anchoAlfombra = PASILLO_CENTRAL - 0.36;
   [-1,1].forEach(function(signo){
@@ -215,9 +252,17 @@ function pasillosPatio(){
   // pieza continua (no dos tramos con un hueco en medio) para que enlace
   // sin costura con las dos alfombras verticales en Z_CORREDOR_FIN. A
   // todo el ancho del pasillo (no con el margen de las de arriba).
-  var zCruce=(Z_CORREDOR_INI+Z_CORREDOR_FIN)/2, xFrenteFrontal=limitesFrontal().xFrente;
-  var ptsCruce=[{x:-xFrenteFrontal, z:zCruce}, {x:xFrenteFrontal, z:zCruce}];
+  var zCruce=(Z_CORREDOR_INI+Z_CORREDOR_FIN)/2;
+  var xBase=limitesFrontal().xFrente,xEscalera=geo.escalerasLaterales.xBajo;
+  var ptsCruce=[{x:-xBase,z:zCruce},{x:xBase,z:zCruce}];
   g.add(alfombra(ptsCruce, PASILLO_CENTRAL, MAT.alfombra));
+  [-1,1].forEach(function(signo){
+    var e=geo.escalerasLaterales;
+    // Solapa 6 cm bajo ambas piezas contiguas y conserva testeros rectos.
+    g.add(enlaceAlfombra(
+      signo*(xBase-0.06),zCruce,PASILLO_CENTRAL,
+      signo*(xEscalera+0.06),e.centroZ,e.ancho-0.08,MAT.alfombra));
+  });
   return g;
 }
 
@@ -548,7 +593,7 @@ function escalerasLaterales(){
 
       // Alfombra sobre cada huella; se deja un vivo mínimo de madera
       // para que el borde del peldaño continúe siendo legible.
-      var alf=new THREE.Mesh(new THREE.BoxGeometry(largo-0.018,0.026,e.ancho-0.08),MAT.alfombra);
+      var alf=new THREE.Mesh(new THREE.BoxGeometry(largo-0.018,0.026,e.ancho-0.08),MAT.alfombraEscalera);
       alf.position.set(signo*(x0+x1)/2,alto+0.013,(z0+z1)/2);
       alf.rotation.y=pel.rotation.y;
       g.add(alf);
@@ -556,10 +601,20 @@ function escalerasLaterales(){
       // La misma alfombra baja por la contrahuella. Se coloca apenas
       // adelantada para evitar z-fighting con la caja de madera.
       var altoPaso=e.altura/e.peldanos,ux=dx/largo,uz=dz/largo;
-      var frente=new THREE.Mesh(new THREE.BoxGeometry(0.026,altoPaso-0.012,e.ancho-0.08),MAT.alfombra);
+      var frente=new THREE.Mesh(new THREE.BoxGeometry(0.026,altoPaso-0.012,e.ancho-0.08),MAT.alfombraEscalera);
       frente.position.set(signo*x0-ux*0.013,alto-altoPaso/2,z0-uz*0.013);
       frente.rotation.y=pel.rotation.y;
       g.add(frente);
+
+      // Zócalos escalonados a ambos lados, ligeramente por encima de
+      // cada huella para rematar la escalera contra los palcos.
+      [-1,1].forEach(function(lado){
+        var zocalo=new THREE.Mesh(new THREE.BoxGeometry(largo+0.02,alto+0.12,0.10),MAT.maderaPlatea);
+        zocalo.position.set(signo*(x0+x1)/2,(alto+0.12)/2,
+          (z0+z1)/2+lado*(e.ancho/2-0.05));
+        zocalo.rotation.y=pel.rotation.y;
+        g.add(zocalo);
+      });
     }
   });
   return g;
@@ -1102,7 +1157,38 @@ function pasilloCurvoPalcos(escena,plan,ini,fin,yBase){
   var interior=geo.dentro(plan,-2.0).slice(ini,fin+1);
   var exterior=geo.dentro(plan,-5.0).slice(ini,fin+1);
   escena.add(banda(interior,exterior,yBase,yBase,MAT.parquetPlatea));
-  escena.add(cinta(exterior,yBase,P.pisos[1].y,MAT.muro));
+  // El muro burdeos exterior deja libre una entrada en cada extremo,
+  // justo frente a las escaleras de acceso.
+  var margenEntrada=2;
+  escena.add(cinta(exterior.slice(margenEntrada,exterior.length-margenEntrada),yBase,P.pisos[1].y,MAT.muro));
+}
+
+function texturaSalida(flecha){
+  var c=document.createElement('canvas');c.width=512;c.height=192;
+  var x=c.getContext('2d');
+  x.fillStyle='#08743b';x.fillRect(0,0,c.width,c.height);
+  x.strokeStyle='#d9f7df';x.lineWidth=10;x.strokeRect(8,8,c.width-16,c.height-16);
+  x.fillStyle='#ffffff';x.font='bold 58px sans-serif';x.textAlign='center';
+  x.fillText('SALIDA  EXIT',256,82);
+  x.font='bold 62px sans-serif';x.fillText(flecha,256,154);
+  return new THREE.CanvasTexture(c);
+}
+
+/* Conexión sin puerta entre cada escalera lateral y el extremo abierto
+   del corredor posterior. */
+function salidasEscalerasPasillo(escena,altura){
+  var e=geo.escalerasLaterales,xIni=e.xAlto,xFin=18.65,largo=xFin-xIni;
+  [-1,1].forEach(function(signo){
+    var suelo=new THREE.Mesh(new THREE.BoxGeometry(largo,altura,e.ancho),MAT.parquetPlatea);
+    suelo.position.set(signo*(xIni+xFin)/2,altura/2,e.centroZ);escena.add(suelo);
+
+    var matCartel=new THREE.MeshBasicMaterial({map:texturaSalida(signo>0?'→':'←'),side:THREE.DoubleSide});
+    registrar(matCartel);
+    var cartel=new THREE.Mesh(new THREE.PlaneGeometry(1.65,0.62),matCartel);
+    cartel.position.set(signo*(xFin-0.18),3.02,e.centroZ);
+    cartel.rotation.y=-signo*Math.PI/2;
+    escena.add(cartel);
+  });
 }
 
 /* ---------------- MONTAJE ----------------------------------------- */
@@ -1116,10 +1202,12 @@ function construir(escena){
   // cada palco con su antepalco posterior. Conserva un zócalo bajo el
   // suelo y continúa normalmente por encima del piso principal.
   escena.add(cinta(geo.PLAN, function(p){return geo.rake(p.z);}, function(p){
-    return p.z>=Z_CORREDOR_FIN ? geo.platea.altura : P.altura;
+    // Desde el final del palco frontal se rebaja el muro hasta el suelo
+    // de platea para abrir la salida hacia el corredor.
+    return p.z>=Z_CORREDOR_INI-0.8 ? geo.platea.altura : P.altura;
   }, MAT.muro));
   escena.add(cinta(geo.PLAN, function(p){
-    return p.z>=Z_CORREDOR_FIN ? P.pisos[1].y : P.altura;
+    return p.z>=Z_CORREDOR_INI-0.8 ? P.pisos[1].y : P.altura;
   }, P.altura, MAT.muro));
 
   // Los cuatro niveles de la herradura.
@@ -1194,7 +1282,8 @@ function construir(escena){
         escena.add(banda(bF, plF, yFrontal, yFrontal, MAT.suelo));
         escena.add(cinta(bF, function(){return ALTURA_FRONTAL+ALTURA_BARANDILLA_PLATEA;}, function(){return ALTURA_FRONTAL+ALTURA_BARANDILLA_PLATEA+0.035;}, MAT.terciopelo2));
         sillasPalco(escena, bF, plF, 0, 2, 1, yFrontal, sillaPalcoGeo);
-        // Tabique que cierra el Frontal hacia el pasillo transversal.
+        // Tabique blanco propio del palco frontal. La apertura al
+        // corredor se practica en el muro burdeos exterior, no aquí.
         var cierre=new THREE.Mesh(new THREE.BoxGeometry(ANCHO_FRONTAL, piso.alto+1.5, 0.16), MAT.yeso);
         cierre.position.set((xFondo+xFrente)/2, ALTURA_FRONTAL+(piso.alto+1.5)/2, Z_CORREDOR_INI);
         escena.add(cierre);
@@ -1238,6 +1327,7 @@ function construir(escena){
       antepalcosPlatea(escena, geo.PLAN, iAlaD, corteD, piso.palcosLado, yPiso);
       antepalcosPlatea(escena, geo.PLAN, corteI, iAlaI, piso.palcosLado, yPiso);
       pasilloCurvoPalcos(escena,geo.PLAN,iAlaD,iAlaI,yPiso);
+      salidasEscalerasPasillo(escena,ALTURA_PLATEA);
     } else {
       escena.add(cinta(borde, yPiso, yTop, MAT.antepecho));                 // antepecho
       escena.add(banda(borde, geo.PLAN, yTop, yTop, MAT.hueco));            // hueco del palco

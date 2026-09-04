@@ -14,6 +14,12 @@ function textura(ruta, repX, repY){
 var texParquet      = textura('Textures/Parquet.webp', 14, 16);
 var texParquetPlatea= textura('Textures/Parquet.webp', 1, 1);
 var texAlfombra     = textura('Textures/RedCarpet.webp', 1, 1); // el largo se controla en el propio UV de la alfombra
+// Carga independiente: clonar antes de que TextureLoader termine puede
+// dejar la copia sin imagen y producir peldaños negros.
+var texAlfombraEscalera=textura('Textures/RedCarpet.webp',1,1);
+texAlfombraEscalera.center.set(0.5,0.5);
+texAlfombraEscalera.rotation=Math.PI/2;
+texAlfombraEscalera.needsUpdate=true;
 var texTelon        = textura('Textures/Telon.webp', 1, 1);     // ídem: el UV de la cortina ya mete su propio repetido
 var texMaderaButaca = textura('Textures/MaderaButaca.webp', 1, 1);
 var texMaderaBlanca = textura('Textures/MaderaBlanca.webp', 1, 1);
@@ -55,6 +61,8 @@ var MAT = {
   // basta él solo para evitar el parpadeo/hundimiento con el parquet al
   // verla de lejos o en rasante, así que se combinan las dos.
   alfombra:   new THREE.MeshLambertMaterial({map:texAlfombra, side:THREE.DoubleSide,
+                 polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4}),
+  alfombraEscalera:new THREE.MeshLambertMaterial({map:texAlfombraEscalera, side:THREE.DoubleSide,
                  polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4}),
   muro:       new THREE.MeshLambertMaterial({color:0x2a1519, side:THREE.DoubleSide}),
   antepecho:  new THREE.MeshLambertMaterial({color:0x6b2226, side:THREE.DoubleSide}),

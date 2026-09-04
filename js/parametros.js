@@ -39,6 +39,28 @@ function rake(z){ return P.rake * Math.max(0, z - P.zRake); }
 function planta(){
   var pts=[], i, t;
   for(i=0;i<=72;i++){ t=P.tmax-2*P.tmax*i/72; pts.push({x:P.Rx*Math.sin(t), z:P.zc+P.Rz*Math.cos(t)}); }
+
+  /* Ensayo de palco 2 recto. Su primer módulo (z≈4.18..6.40) mantiene
+     X constante, igual que el palco frontal; después recupera la curva
+     gradualmente hasta el centro de la herradura. Al modificar la planta
+     maestra, suelos, barandillas, puertas, corredor y colisiones quedan
+     alineados sin piezas superpuestas. */
+  var zInicio=3.2,zFinRecto=6.45,zFinTransicion=9.8,xRecto=null;
+  for(i=0;i<pts.length;i++){
+    if(pts[i].x>0 && pts[i].z>=zInicio){xRecto=pts[i].x;break;}
+  }
+  if(xRecto!==null){
+    for(i=0;i<pts.length;i++){
+      var signo=pts[i].x<0?-1:1, ax=Math.abs(pts[i].x);
+      if(pts[i].z>=zInicio && pts[i].z<=zFinRecto){
+        pts[i].x=signo*xRecto;
+      }else if(pts[i].z>zFinRecto && pts[i].z<zFinTransicion){
+        var u=(pts[i].z-zFinRecto)/(zFinTransicion-zFinRecto);
+        u=u*u*(3-2*u);
+        pts[i].x=signo*(xRecto+(ax-xRecto)*u);
+      }
+    }
+  }
   return pts;
 }
 var PLAN = planta();
@@ -46,7 +68,10 @@ var PLAN = planta();
 /* Dos escaleras rectas que ocupan, sin holgura, toda la franja entre
    el final del palco frontal (Z_CORREDOR_INI=1.8) y el comienzo del
    palco 2 de platea (Z_CORREDOR_FIN=3.2). */
-var ESCALERAS_LATERALES={centroZ:2.50,curvaZ:0,ancho:1.40,xBajo:10.25,xAlto:12.25,altura:1.05,peldanos:7};
+// La franja llega desde el final del palco frontal (z=1.8) hasta la
+// cara oblicua de la mampara; termina en z=4.25 para respetar también
+// su punto más cercano y el grosor de los zócalos.
+var ESCALERAS_LATERALES={centroZ:3.025,curvaZ:0,ancho:2.45,xBajo:10.25,xAlto:12.25,altura:1.05,peldanos:7};
 
 function centroZEscalera(e,t){ return e.centroZ+e.curvaZ*Math.sin(Math.PI*t); }
 
@@ -111,6 +136,14 @@ function dentroDeContornoAbierto(pts,x,z){
 function enPlatea(x,z){
   return z>=3.2 && dentroDeContornoAbierto(EXTERIOR_PASILLO,x,z) && !dentroDeContornoAbierto(BORDE_PLATEA,x,z);
 }
+/* Rellanos rectos que enlazan las escaleras próximas al escenario con
+   los dos extremos abiertos del corredor posterior. */
+function enSalidaPasillo(x,z){
+  var ax=Math.abs(x);
+  return ax>=ESCALERAS_LATERALES.xAlto-0.05 && ax<=18.65 &&
+         z>=ESCALERAS_LATERALES.centroZ-ESCALERAS_LATERALES.ancho/2 &&
+         z<=ESCALERAS_LATERALES.centroZ+ESCALERAS_LATERALES.ancho/2+0.08;
+}
 function distAPlanta(x,z){
   var m=1e9,i;
   for(i=0;i<PLAN.length-1;i++){
@@ -130,6 +163,7 @@ FALLA.geo = {
   dentroDePlanta: dentroDePlanta,
   distAPlanta: distAPlanta,
   enPlatea: enPlatea,
+  enSalidaPasillo: enSalidaPasillo,
   platea: {altura:rake(P.zc+P.Rz)+0.40},
   escalerasLaterales: ESCALERAS_LATERALES,
   alturaEscaleraLateral: alturaEscaleraLateral,

@@ -35,6 +35,8 @@ function terrenoAltura(x,z){
   var alturaEscalera=geo.alturaEscaleraLateral(x,z);
   if(alturaEscalera!==null) return alturaEscalera;
 
+  if(geo.enSalidaPasillo(x,z)) return geo.platea.altura;
+
   // El muro de la embocadura solo tiene paso entre sus dos jambas.
   if(z > -0.6 && z < 0.35 && Math.abs(x) > geo.P.arcoA) return null;
 
@@ -112,6 +114,15 @@ function mirada(){
 
 function entrar(camaraRef, el, cb){
   camara=camaraRef; elemento=el; alSalirCb=cb||null;
+  if(!elemento._paseoRecaptura){
+    elemento.addEventListener('click',function(){
+      if(activo && document.pointerLockElement!==elemento){
+        var p=elemento.requestPointerLock();
+        if(p && p.catch)p.catch(function(){});
+      }
+    });
+    elemento._paseoRecaptura=true;
+  }
   x=camara.position.x; z=camara.position.z;
 
   camara.getWorldDirection(vDir);

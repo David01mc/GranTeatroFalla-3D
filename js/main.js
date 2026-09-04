@@ -76,6 +76,16 @@ function iniciar(){
     btTelon.textContent = cerrado ? 'Abrir telón' : 'Cerrar telón';
   });
 
+  // Entrada predeterminada: de pie frente al escenario y mirando hacia
+  // el telón. Un clic sobre la escena captura el ratón si el navegador
+  // rechaza el pointer-lock automático durante la carga.
+  camara.position.set(0,1.70+FALLA.geo.rake(2.45),2.45);
+  camara.lookAt(0,3.8,-5.5);
+  FALLA.orbit.pausar();
+  FALLA.paseo.entrar(camara,render.domElement,alSalirDePaseo);
+  btPaseo.setAttribute('aria-pressed','true');
+  botonesVista.forEach(function(o){o.removeAttribute('aria-pressed');o.disabled=true;});
+
   reloj=new THREE.Clock();
   animar();
 
