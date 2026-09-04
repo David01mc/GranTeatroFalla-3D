@@ -20,7 +20,7 @@ var P = {
   altura: 13.4,      // hasta el techo de Abárzuza
   pisos: [           // y del piso, y del antepecho, retranqueo, nº de palcos
     {y:0.00, alto:1.15, dentro:2.90, palcos:0, palcosLado:9, nombre:'platea'},
-    {y:3.60, alto:1.15, dentro:2.10, palcos:22, nombre:'principal'},
+    {y:4.10, alto:1.15, dentro:2.10, palcos:22, palcosLado:11, nombre:'principal'},
     {y:6.70, alto:1.10, dentro:2.70, palcos:20, nombre:'segundo'},
     {y:9.60, alto:1.05, dentro:3.30, palcos:0,  nombre:'paraíso'}
   ],

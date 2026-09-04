@@ -23,6 +23,7 @@ var yaw=0, pitch=0;
 var teclas={};
 var x=0, z=0;               // posición horizontal del jugador
 var alturaSalto=0, velocidadSalto=0;
+var sentado=null;
 var alSalirCb=null;
 var vDir=new THREE.Vector3();
 
@@ -49,13 +50,12 @@ function terrenoAltura(x,z){
   return null;
 }
 
-/* De pie solo se puede caminar por los pasillos: una butaca bloquea el paso
-   igual que un muro. En el aire (saltando) las butacas no cuentan, así que
-   un salto sirve para cruzar por encima de una fila. */
+/* Las butacas bloquean solo su volumen real, no el bloque rectangular
+   completo; de este modo se puede avanzar por los huecos entre ellas. */
 function posicionValida(px,pz){
   if(terrenoAltura(px,pz)===null) return false;
   if(FALLA.puertas && FALLA.puertas.bloquea(px,pz)) return false;
-  if(alturaSalto<=0.02 && !geo.enPlatea(px,pz) && geo.enBloqueAsientos(px,pz)) return false;
+  if(alturaSalto<=0.02 && !geo.enPlatea(px,pz) && geo.enButacaIndividual(px,pz)) return false;
   return true;
 }
 
@@ -84,7 +84,33 @@ function moverA(nx, nz){
 }
 
 function saltar(){
-  if(alturaSalto<=0 && velocidadSalto===0) velocidadSalto=IMPULSO_SALTO;
+  if(!sentado && alturaSalto<=0 && velocidadSalto===0) velocidadSalto=IMPULSO_SALTO;
+}
+
+function butacaCercana(distancia){
+  var mejor=null,dm=distancia||0.72,sitios=geo.sitiosButacas||[];
+  for(var i=0;i<sitios.length;i++){
+    var d=Math.hypot(x-sitios[i].x,z-sitios[i].z);
+    if(d<dm){dm=d;mejor=sitios[i];}
+  }
+  return mejor;
+}
+
+function interactuar(){
+  if(sentado){
+    x=sentado.x;z=sentado.z-0.58;sentado=null;
+    alturaSalto=0;velocidadSalto=0;
+    return;
+  }
+  if(FALLA.puertas && FALLA.puertas.cercana(x,z,1.75)){
+    FALLA.puertas.alternarCercana(x,z);return;
+  }
+  var s=butacaCercana(0.78);
+  if(s){
+    sentado=s;x=s.x;z=s.z-0.08;
+    alturaSalto=0;velocidadSalto=0;
+    yaw=0;pitch=-0.04;teclas={};
+  }
 }
 
 function alMoverRaton(e){
@@ -99,7 +125,7 @@ function alTeclaAbajo(e){
   e.preventDefault(); // evita que Espacio/flechas activen botones o desplacen la página
   teclas[e.code]=true;
   if(e.code==='Space') saltar();
-  if(e.code==='KeyE' && !e.repeat && FALLA.puertas) FALLA.puertas.alternarCercana(x,z);
+  if(e.code==='KeyE' && !e.repeat) interactuar();
 }
 function alTeclaArriba(e){ teclas[e.code]=false; }
 function alCambioBloqueo(){
@@ -133,6 +159,7 @@ function entrar(camaraRef, el, cb){
   if(suelo===null) suelo = geo.rake(z);
   alturaSalto = Math.max(0, camara.position.y - suelo - ALTURA_OJO);
   velocidadSalto = 0;
+  sentado=null;
   teclas = {};
 
   activo=true;
@@ -166,21 +193,28 @@ function actualizar(dt){
   if(teclas.KeyD){ dx+=r.x; dz+=r.z; }
   if(teclas.KeyA){ dx-=r.x; dz-=r.z; }
   var L=Math.hypot(dx,dz);
-  if(L>0) moverA(x+(dx/L)*VELOCIDAD*dt, z+(dz/L)*VELOCIDAD*dt);
+  if(!sentado && L>0) moverA(x+(dx/L)*VELOCIDAD*dt, z+(dz/L)*VELOCIDAD*dt);
 
-  velocidadSalto -= GRAVEDAD*dt;
-  alturaSalto += velocidadSalto*dt;
-  if(alturaSalto<=0){ alturaSalto=0; velocidadSalto=0; }
+  if(!sentado){
+    velocidadSalto -= GRAVEDAD*dt;
+    alturaSalto += velocidadSalto*dt;
+    if(alturaSalto<=0){ alturaSalto=0; velocidadSalto=0; }
+  }
 
   var suelo = terrenoAltura(x,z);
   if(suelo===null) suelo = geo.rake(z); // colchón de seguridad, no debería alcanzarse
 
-  camara.position.set(x, suelo+ALTURA_OJO+alturaSalto, z);
+  camara.position.set(x, suelo+(sentado?1.16:ALTURA_OJO+alturaSalto), z);
   camara.rotation.set(pitch, yaw, 0, 'YXZ');
 
   var aviso=document.getElementById('interaccion');
   if(aviso){
-    aviso.hidden=!(FALLA.puertas && FALLA.puertas.cercana(x,z,1.75));
+    var juntoPuerta=!sentado && FALLA.puertas && FALLA.puertas.cercana(x,z,1.75);
+    var juntoButaca=!sentado && butacaCercana(0.78);
+    aviso.hidden=!(sentado||juntoPuerta||juntoButaca);
+    if(sentado) aviso.textContent='Pulsa E para levantarte';
+    else if(juntoPuerta) aviso.textContent='Pulsa E para abrir o cerrar la puerta';
+    else if(juntoButaca) aviso.textContent='Pulsa E para sentarte';
   }
 }
 

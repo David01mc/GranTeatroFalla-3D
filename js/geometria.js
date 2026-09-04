@@ -132,10 +132,10 @@ var PASILLO_CENTRAL = 1.4;   // ancho de los dos pasillos entre el bloque centra
 var PASILLO_LATERAL = 1.2;   // ancho de los dos pasillos junto a los muros
 var Z_FILA1 = 3.8;           // profundidad (z) de la fila 1, la más cercana al escenario
 
-var FILAS_CENTRO = 16, ASIENTOS_CENTRO = 9;
-var FILAS_LATERAL = 15;
+var FILAS_CENTRO = 21, ASIENTOS_CENTRO = 9;
+var FILAS_LATERAL = 20;
 // fila 1 (junto al escenario) .. fila 15 (junto al fondo de la sala)
-var ASIENTOS_LATERAL = [6,6,6, 7,7,7,7,7,7,7,7, 6,5,4,2];
+var ASIENTOS_LATERAL = [6,6,6, 7,7,7,7,7,7,7,7, 7,7,7,7, 6,6,5,4,3];
 
 var CENTRO_MEDIO = ASIENTOS_CENTRO/2*ASIENTO_PASO;              // media anchura del bloque central
 var LATERAL_DENTRO = CENTRO_MEDIO + PASILLO_CENTRAL;             // borde interior (hacia el pasillo central) de cada lateral
@@ -208,6 +208,18 @@ function sitiosLateral(signo){
   }
   return out;
 }
+
+var SITIOS_BUTACAS=sitiosCentro().concat(sitiosLateral(-1),sitiosLateral(1));
+geo.sitiosButacas=SITIOS_BUTACAS;
+geo.enButacaIndividual=function(x,z){
+  for(var i=0;i<SITIOS_BUTACAS.length;i++){
+    var s=SITIOS_BUTACAS[i];
+    // Caja ajustada al asiento: deja libres los huecos de 12 cm entre
+    // butacas y el espacio longitudinal entre filas.
+    if(Math.abs(x-s.x)<0.24 && Math.abs(z-s.z)<0.34)return true;
+  }
+  return false;
+};
 
 /* ¿(x,z) cae sobre una butaca? (para el modo paseo: solo se puede caminar
    por los pasillos, y hay que saltar para pasar por encima de las filas). */
@@ -1191,6 +1203,39 @@ function salidasEscalerasPasillo(escena,altura){
   });
 }
 
+/* Sala de autoridades oculta detrás del tramo central curvo. Desde el
+   patio se percibe la misma fachada continua que en el resto del piso. */
+function palcoAutoridades(escena,sillaGeo,y){
+  var ancho=8.8,zFrente=26.95,zFondo=31.55;
+  var suelo=new THREE.Mesh(new THREE.BoxGeometry(ancho,0.18,zFondo-zFrente),MAT.parquetPlatea);
+  suelo.position.set(0,y-0.09,(zFrente+zFondo)/2);escena.add(suelo);
+
+  // Los cerramientos comienzan retrasados: no cortan la fachada curva
+  // ni delatan desde el patio que detrás existe una sala más profunda.
+  [-1,1].forEach(function(s){
+    var lateral=new THREE.Mesh(new THREE.BoxGeometry(0.16,2.55,zFondo-28.15),MAT.muro);
+    lateral.position.set(s*ancho/2,y+1.275,(28.15+zFondo)/2);escena.add(lateral);
+  });
+  var fondo=new THREE.Mesh(new THREE.BoxGeometry(ancho,2.55,0.18),MAT.muro);
+  fondo.position.set(0,y+1.275,zFondo);escena.add(fondo);
+
+  var posiciones=[];
+  for(var fila=0;fila<5;fila++){
+    for(var col=0;col<8;col++){
+      posiciones.push({x:(col-3.5)*0.88,y:y,z:zFrente+0.42+fila*0.78});
+    }
+  }
+  var m=new THREE.Matrix4(),q=new THREE.Quaternion(),escala=new THREE.Vector3(1,1,1),pos=new THREE.Vector3();
+  ['asiento','respaldo','base'].forEach(function(parte){
+    var mat=parte==='base'?MAT.maderaButaca:MAT.terciopeloButaca;
+    var im=new THREE.InstancedMesh(sillaGeo[parte],mat,posiciones.length);
+    posiciones.forEach(function(p,i){
+      pos.set(p.x,p.y,p.z);m.compose(pos,q,escala);im.setMatrixAt(i,m);
+    });
+    im.instanceMatrix.needsUpdate=true;escena.add(im);
+  });
+}
+
 /* ---------------- MONTAJE ----------------------------------------- */
 function construir(escena){
   escena.background=new THREE.Color(0x0d0608);
@@ -1333,7 +1378,22 @@ function construir(escena){
       escena.add(banda(borde, geo.PLAN, yTop, yTop, MAT.hueco));            // hueco del palco
       escena.add(banda(borde, geo.PLAN, yPiso, yPiso, MAT.suelo));          // suelo del palco
       escena.add(cinta(borde, yTop, function(p){return yTop(p)+0.14;}, MAT.oro)); // moldura
-      if(piso.palcos) separadoresPalco(escena, borde, geo.PLAN, 0, borde.length-1, piso.palcos, piso.y, piso.alto);
+      if(n===1){
+        // Once palcos por lado. El tramo central posterior queda
+        // reservado al palco de autoridades, no recibe separadores.
+        var limiteAutoridadD=-1;
+        for(var ia=0;ia<geo.PLAN.length;ia++){
+          if(geo.PLAN[ia].x<=4.4){limiteAutoridadD=ia;break;}
+        }
+        var limiteAutoridadI=geo.PLAN.length-1-limiteAutoridadD;
+        separadoresPalco(escena,borde,geo.PLAN,0,limiteAutoridadD,piso.palcosLado,piso.y,piso.alto);
+        separadoresPalco(escena,borde,geo.PLAN,limiteAutoridadI,borde.length-1,piso.palcosLado,piso.y,piso.alto);
+        sillasPalco(escena,borde,geo.PLAN,0,limiteAutoridadD,piso.palcosLado,yPiso,sillaPalcoGeo);
+        sillasPalco(escena,borde,geo.PLAN,limiteAutoridadI,borde.length-1,piso.palcosLado,yPiso,sillaPalcoGeo);
+        palcoAutoridades(escena,sillaPalcoGeo,piso.y);
+      }else if(piso.palcos){
+        separadoresPalco(escena,borde,geo.PLAN,0,borde.length-1,piso.palcos,piso.y,piso.alto);
+      }
     }
   });
 
