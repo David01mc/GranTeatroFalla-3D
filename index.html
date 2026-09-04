@@ -66,6 +66,12 @@
     background:var(--tinta);color:var(--humo);font-size:14px;letter-spacing:.06em;
     transition:opacity .6s ease;
   }
+  #interaccion{
+    position:fixed;left:50%;bottom:82px;z-index:8;transform:translateX(-50%);
+    padding:8px 13px;color:var(--marfil);background:rgba(20,9,10,.82);
+    border:1px solid rgba(201,146,47,.65);border-radius:2px;font-size:14px;
+    pointer-events:none;
+  }
   @media (prefers-reduced-motion:reduce){#carga{transition:none}}
   @media (max-width:560px){
     .rotulo{top:14px;left:16px;max-width:66vw}
@@ -93,6 +99,7 @@
 </nav>
 
 <div id="carga">construyendo la sala</div>
+<div id="interaccion" hidden>Pulsa E para abrir o cerrar la puerta</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/parametros.js"></script>

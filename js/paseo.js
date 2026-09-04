@@ -35,7 +35,7 @@ function terrenoAltura(x,z){
   var alturaEscalera=geo.alturaEscaleraLateral(x,z);
   if(alturaEscalera!==null) return alturaEscalera;
 
-  // El muro de la embocadura solo tiene hueco entre -arcoA y +arcoA.
+  // El muro de la embocadura solo tiene paso entre sus dos jambas.
   if(z > -0.6 && z < 0.35 && Math.abs(x) > geo.P.arcoA) return null;
 
   // Suelo horizontal elevado de la platea. Por ahora solo colisiona la
@@ -52,6 +52,7 @@ function terrenoAltura(x,z){
    un salto sirve para cruzar por encima de una fila. */
 function posicionValida(px,pz){
   if(terrenoAltura(px,pz)===null) return false;
+  if(FALLA.puertas && FALLA.puertas.bloquea(px,pz)) return false;
   if(alturaSalto<=0.02 && !geo.enPlatea(px,pz) && geo.enBloqueAsientos(px,pz)) return false;
   return true;
 }
@@ -90,12 +91,13 @@ function alMoverRaton(e){
   pitch -= e.movementY*0.0022;
   pitch = Math.max(-1.4, Math.min(1.4, pitch));
 }
-var TECLAS_USADAS = {KeyW:1, KeyA:1, KeyS:1, KeyD:1, Space:1};
+var TECLAS_USADAS = {KeyW:1, KeyA:1, KeyS:1, KeyD:1, KeyE:1, Space:1};
 function alTeclaAbajo(e){
   if(!activo || !TECLAS_USADAS[e.code]) return;
   e.preventDefault(); // evita que Espacio/flechas activen botones o desplacen la página
   teclas[e.code]=true;
   if(e.code==='Space') saltar();
+  if(e.code==='KeyE' && !e.repeat && FALLA.puertas) FALLA.puertas.alternarCercana(x,z);
 }
 function alTeclaArriba(e){ teclas[e.code]=false; }
 function alCambioBloqueo(){
@@ -130,6 +132,7 @@ function entrar(camaraRef, el, cb){
 function salir(){
   if(!activo) return;
   activo=false;
+  var aviso=document.getElementById('interaccion'); if(aviso) aviso.hidden=true;
   if(document.pointerLockElement===elemento) document.exitPointerLock();
   var cb=alSalirCb; alSalirCb=null;
   if(cb) cb();
@@ -163,6 +166,11 @@ function actualizar(dt){
 
   camara.position.set(x, suelo+ALTURA_OJO+alturaSalto, z);
   camara.rotation.set(pitch, yaw, 0, 'YXZ');
+
+  var aviso=document.getElementById('interaccion');
+  if(aviso){
+    aviso.hidden=!(FALLA.puertas && FALLA.puertas.cercana(x,z,1.75));
+  }
 }
 
 document.addEventListener('pointerlockchange', alCambioBloqueo);

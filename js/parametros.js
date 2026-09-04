@@ -5,7 +5,7 @@ window.FALLA = window.FALLA || {};
 /* ------------------------------------------------------------------
    PARÁMETROS DE LA SALA
    Todo lo que sigue está sacado de los datos públicos del teatro:
-   planta en herradura, embocadura de arco de herradura emiral,
+   planta en herradura, embocadura rectangular con arco rebajado,
    tres alturas de palcos + paraíso, y un patio de ~500 butacas.
    Cambiando estas cifras cambia el edificio entero.
 -------------------------------------------------------------------*/
@@ -24,7 +24,7 @@ var P = {
     {y:6.70, alto:1.10, dentro:2.70, palcos:20, nombre:'segundo'},
     {y:9.60, alto:1.05, dentro:3.30, palcos:0,  nombre:'paraíso'}
   ],
-  arcoR: 8.4, arcoA: 7.5, arcoYc: 8.9   // embocadura: arco de herradura
+  arcoA: 7.5        // semianchura libre de la boca escénica
 };
 
 function rake(z){ return P.rake * Math.max(0, z - P.zRake); }
@@ -43,10 +43,10 @@ function planta(){
 }
 var PLAN = planta();
 
-/* Dos escaleras simétricas en el hueco transversal entre el palco
-   frontal y el primer palco de platea. Suben desde el pasillo hacia el
-   lateral (eje X), nunca en dirección al escenario. */
-var ESCALERAS_LATERALES={centroZ:2.95,curvaZ:0.25,ancho:2.30,xBajo:10.25,xAlto:12.25,altura:1.05,peldanos:7};
+/* Dos escaleras rectas que ocupan, sin holgura, toda la franja entre
+   el final del palco frontal (Z_CORREDOR_INI=1.8) y el comienzo del
+   palco 2 de platea (Z_CORREDOR_FIN=3.2). */
+var ESCALERAS_LATERALES={centroZ:2.50,curvaZ:0,ancho:1.40,xBajo:10.25,xAlto:12.25,altura:1.05,peldanos:7};
 
 function centroZEscalera(e,t){ return e.centroZ+e.curvaZ*Math.sin(Math.PI*t); }
 
@@ -55,7 +55,7 @@ function alturaEscaleraLateral(x,z){
   var ax=Math.abs(x);
   if(ax<e.xBajo || ax>e.xAlto) return null;
   // Comprueba el rectángulo orientado de cada peldaño, siguiendo la
-  // misma polilínea curva que usa la geometría visible.
+  // misma línea que usa la geometría visible.
   for(var i=e.peldanos-1;i>=0;i--){
     var t0=i/e.peldanos,t1=(i+1)/e.peldanos;
     var x0=e.xBajo+(e.xAlto-e.xBajo)*t0, x1=e.xBajo+(e.xAlto-e.xBajo)*t1;
@@ -96,6 +96,8 @@ function dentroDePlanta(x,z){
    del pasillo transversal hacia el fondo de la herradura. */
 var BORDE_PLATEA=dentro(PLAN,P.pisos[0].dentro);
 var EXTERIOR_ANTEPALCO=dentro(PLAN,-2.0);
+// El antepalco termina a -2 m y el corredor común añade otros 3 m.
+var EXTERIOR_PASILLO=dentro(PLAN,-5.0);
 function dentroDeContornoAbierto(pts,x,z){
   // El test de rayos cierra implícitamente el último punto con el primero.
   var poly=pts;
@@ -107,7 +109,7 @@ function dentroDeContornoAbierto(pts,x,z){
   return dentro;
 }
 function enPlatea(x,z){
-  return z>=3.2 && dentroDeContornoAbierto(EXTERIOR_ANTEPALCO,x,z) && !dentroDeContornoAbierto(BORDE_PLATEA,x,z);
+  return z>=3.2 && dentroDeContornoAbierto(EXTERIOR_PASILLO,x,z) && !dentroDeContornoAbierto(BORDE_PLATEA,x,z);
 }
 function distAPlanta(x,z){
   var m=1e9,i;

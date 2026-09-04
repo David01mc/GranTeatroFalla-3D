@@ -89,6 +89,7 @@ function animar(){
   if(FALLA.paseo.activo) FALLA.paseo.actualizar(dt);
   else FALLA.orbit.actualizar();
   FALLA.telon.actualizar(dt);
+  if(FALLA.puertas) FALLA.puertas.actualizar(dt);
   render.render(escena,camara);
 }
 

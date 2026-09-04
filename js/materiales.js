@@ -25,6 +25,8 @@ var texMudejarGeo   = textura('Textures/MudejarGeometrico.webp', 1, 1);
 var texMudejarFloral= textura('Textures/MudejarFloral.webp', 1, 2);
 var texMudejarArcos = textura('Textures/MudejarArcos.webp', 6, 1);
 var texPuertaPalco  = cargador.load('Textures/PuertaPalcoMudejar.webp');
+var texEmbCrema     = textura('Textures/EmbocaduraCrema.webp', 2, 3);
+var texEmbGeometrica= textura('Textures/EmbocaduraGeometrica.webp', 3, 1);
 
 // La versión WebP ya está desaturada offline: evita crear un canvas y
 // recorrer millones de píxeles durante el arranque.
@@ -43,6 +45,8 @@ var MAT = {
   mudejarFloral:    new THREE.MeshLambertMaterial({map:texMudejarFloral, color:0xb8ae9c}),
   mudejarArcos:     new THREE.MeshLambertMaterial({map:texMudejarArcos, color:0xbdb3a1}),
   puertaPalco:      new THREE.MeshLambertMaterial({map:texPuertaPalco}),
+  embocaduraCrema:  new THREE.MeshLambertMaterial({map:texEmbCrema, color:0xc8b89d, side:THREE.DoubleSide}),
+  embocaduraGeo:    new THREE.MeshLambertMaterial({map:texEmbGeometrica, color:0x9a8175, side:THREE.DoubleSide}),
   suelo:      new THREE.MeshLambertMaterial({color:0x3a2118, side:THREE.DoubleSide}),
   parquet:    new THREE.MeshLambertMaterial({map:texParquet, side:THREE.DoubleSide}),
   parquetPlatea:new THREE.MeshLambertMaterial({map:texParquetPlatea, side:THREE.DoubleSide}),
