@@ -13,6 +13,7 @@ function textura(ruta, repX, repY){
 }
 var texParquet      = textura('Textures/Parquet.webp', 14, 16);
 var texParquetPlatea= textura('Textures/Parquet.webp', 1, 1);
+var texSueloEscenario=textura('Textures/SueloEscenarioDesgastado.webp', 3, 3);
 var texAlfombra     = textura('Textures/RedCarpet.webp', 1, 1); // el largo se controla en el propio UV de la alfombra
 // Carga independiente: clonar antes de que TextureLoader termine puede
 // dejar la copia sin imagen y producir peldaños negros.
@@ -70,6 +71,7 @@ var MAT = {
   yeso:       new THREE.MeshLambertMaterial({color:0xd8c9a8, side:THREE.DoubleSide}),
   hueco:      new THREE.MeshLambertMaterial({color:0x140a0c, side:THREE.DoubleSide}),
   tablas:     new THREE.MeshLambertMaterial({color:0x5b3a24}),
+  sueloEscenario:new THREE.MeshLambertMaterial({map:texSueloEscenario, color:0xc5c5c5}),
   telon:      new THREE.MeshLambertMaterial({map:texTelon, side:THREE.DoubleSide})
 };
 

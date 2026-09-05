@@ -36,6 +36,9 @@ function terrenoAltura(x,z){
   var alturaEscalera=geo.alturaEscaleraLateral(x,z);
   if(alturaEscalera!==null) return alturaEscalera;
 
+  var alturaRampa=geo.alturaRampaTrasera(x,z);
+  if(alturaRampa!==null) return alturaRampa;
+
   if(geo.enSalidaPasillo(x,z)) return geo.platea.altura;
 
   // El muro de la embocadura solo tiene paso entre sus dos jambas.

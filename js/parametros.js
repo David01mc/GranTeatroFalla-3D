@@ -93,6 +93,31 @@ function alturaEscaleraLateral(x,z){
   return null;
 }
 
+/* Rampas posteriores: continúan los dos pasillos de alfombra y alcanzan
+   suavemente la cota horizontal de la platea/corredor. */
+// Llegan hasta la misma corona exterior en la que se apoyan las
+// portadas de los palcos. El antiguo final (26.70) coincidía con la
+// barandilla interior y comprimía los cinco vanos del fondo.
+var RAMPAS_TRASERAS={xInicio:3.40,xFin:4.60,ancho:1.35,anchoFin:1.70,zInicio:23.15,zFin:28.62};
+function centroRampaTrasera(z){
+  var r=RAMPAS_TRASERAS,t=Math.max(0,Math.min(1,(z-r.zInicio)/(r.zFin-r.zInicio)));
+  t=t*t*(3-2*t);
+  return r.xInicio+(r.xFin-r.xInicio)*t;
+}
+function anchoRampaTrasera(z){
+  var r=RAMPAS_TRASERAS,t=Math.max(0,Math.min(1,(z-r.zInicio)/(r.zFin-r.zInicio)));
+  t=t*t*(3-2*t);
+  return r.ancho+(r.anchoFin-r.ancho)*t;
+}
+function alturaRampaTrasera(x,z){
+  var r=RAMPAS_TRASERAS;
+  if(Math.abs(Math.abs(x)-centroRampaTrasera(z))>anchoRampaTrasera(z)/2 || z<r.zInicio || z>r.zFin)return null;
+  var t=(z-r.zInicio)/(r.zFin-r.zInicio);
+  t=t*t*(3-2*t);
+  var y0=rake(r.zInicio),y1=rake(P.zc+P.Rz)+0.40;
+  return y0+(y1-y0)*t;
+}
+
 /* Desplaza la planta hacia dentro d metros (para pisos y antepechos). */
 function dentro(pts,d){
   var out=[],i;
@@ -119,6 +144,7 @@ function dentroDePlanta(x,z){
 /* Huella horizontal de la platea inferior. Es la franja comprendida
    entre el muro exterior y el borde retranqueado 2.9 m, desde el final
    del pasillo transversal hacia el fondo de la herradura. */
+var plateaAltura=rake(P.zc+P.Rz)+0.40;
 var BORDE_PLATEA=dentro(PLAN,P.pisos[0].dentro);
 var EXTERIOR_ANTEPALCO=dentro(PLAN,-2.0);
 // El antepalco termina a -2 m y el corredor común añade otros 3 m.
@@ -164,9 +190,13 @@ FALLA.geo = {
   distAPlanta: distAPlanta,
   enPlatea: enPlatea,
   enSalidaPasillo: enSalidaPasillo,
-  platea: {altura:rake(P.zc+P.Rz)+0.40},
+  platea: {altura:plateaAltura},
   escalerasLaterales: ESCALERAS_LATERALES,
   alturaEscaleraLateral: alturaEscaleraLateral,
+  rampasTraseras:RAMPAS_TRASERAS,
+  centroRampaTrasera:centroRampaTrasera,
+  anchoRampaTrasera:anchoRampaTrasera,
+  alturaRampaTrasera:alturaRampaTrasera,
   // caja del suelo del escenario (ver geometria.js: escenario()) — la usa el modo paseo para pisar las tablas
   escenario: {altura:1.05, mitadX:9, zFondo:-17, zFrente:-0.7}
 };
