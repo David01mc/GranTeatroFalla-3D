@@ -42,6 +42,10 @@
     padding:14px 16px calc(14px + env(safe-area-inset-bottom));
     display:flex;gap:8px;align-items:center;
     overflow-x:auto;scrollbar-width:none;
+    /* body lleva touch-action:none para que arrastrar la escena no haga
+       scroll de la página; sin esta línea la barra heredaría el veto y
+       tampoco se podría deslizar con el dedo. */
+    touch-action:pan-x;
     background:linear-gradient(to top,rgba(10,5,5,.85),rgba(10,5,5,0));
   }
   .barra::-webkit-scrollbar{display:none}
@@ -76,6 +80,20 @@
   @media (max-width:560px){
     .rotulo{top:14px;left:16px;max-width:66vw}
     .rotulo p{font-size:11.5px}
+    /* En una pantalla estrecha los ocho botones no caben en una fila. En
+       vez de esconder la mitad tras un scroll que nadie adivina, la
+       barra se reparte en varias líneas y todo queda a la vista. */
+    .barra{
+      flex-wrap:wrap;justify-content:center;gap:6px;
+      padding:10px 10px calc(10px + env(safe-area-inset-bottom));
+    }
+    button{font-size:13px;padding:8px 11px 9px}
+    .sep{display:none}
+  }
+  /* Un dedo necesita más superficie que un puntero, aunque la pantalla
+     sea ancha (tablet, portátil táctil). */
+  @media (pointer:coarse){
+    button{min-height:42px}
   }
 </style>
 </head>

@@ -76,15 +76,30 @@ function iniciar(){
     btTelon.textContent = cerrado ? 'Abrir telón' : 'Cerrar telón';
   });
 
-  // Entrada predeterminada: de pie frente al escenario y mirando hacia
-  // el telón. Un clic sobre la escena captura el ratón si el navegador
-  // rechaza el pointer-lock automático durante la carga.
-  camara.position.set(0,1.70+FALLA.geo.rake(2.45),2.45);
-  camara.lookAt(0,3.8,-5.5);
-  FALLA.orbit.pausar();
-  FALLA.paseo.entrar(camara,render.domElement,alSalirDePaseo);
-  btPaseo.setAttribute('aria-pressed','true');
-  botonesVista.forEach(function(o){o.removeAttribute('aria-pressed');o.disabled=true;});
+  /* El modo paseo anda con WASD y mira con el pointer lock: en un
+     dispositivo sin ratón no hay ni una cosa ni la otra, y arrancar en
+     él dejaba la escena bloqueada y, de paso, todos los botones de vista
+     deshabilitados. La órbita sí trae arrastre y pellizco, así que allí
+     es la entrada natural. */
+  // Se mira el puntero primario, no `any-pointer`: un portátil con
+  // pantalla táctil tiene los dos y ahí el paseo sí funciona; lo que
+  // decide es si con lo que se apunta habitualmente es un dedo.
+  var sinRaton = !matchMedia('(pointer: fine)').matches;
+
+  if(sinRaton){
+    btPaseo.disabled=true;
+    btPaseo.title='El modo paseo necesita teclado y ratón';
+  }else{
+    // Entrada predeterminada: de pie frente al escenario y mirando hacia
+    // el telón. Un clic sobre la escena captura el ratón si el navegador
+    // rechaza el pointer-lock automático durante la carga.
+    camara.position.set(0,1.70+FALLA.geo.rake(2.45),2.45);
+    camara.lookAt(0,3.8,-5.5);
+    FALLA.orbit.pausar();
+    FALLA.paseo.entrar(camara,render.domElement,alSalirDePaseo);
+    btPaseo.setAttribute('aria-pressed','true');
+    botonesVista.forEach(function(o){o.removeAttribute('aria-pressed');o.disabled=true;});
+  }
 
   reloj=new THREE.Clock();
   animar();
