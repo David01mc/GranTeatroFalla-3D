@@ -40,7 +40,8 @@ var texBaldosaPasillo=textura('Textures/BaldosasPasilloClaras.webp', 1, 1);
 var texTerciopeloPasamanos=textura('Textures/TerciopeloPasamanos.webp', 1, 1);
 // Acabado del canto visible del entresuelo: paño malva entre molduras
 // horizontales, sin la cenefa de arquillos de la parte superior.
-var texEntresuelo   = textura('Textures/EntresueloOrnamental.png', 0.33, 1);
+var texEntresuelo   = textura('Textures/EntresueloOrnamental.webp', 0.33, 1);
+var texBronceAplique= textura('Textures/BronceApliqueEnvejecido.webp', 2, 2);
 
 // La versión WebP ya está desaturada offline: evita crear un canvas y
 // recorrer millones de píxeles durante el arranque.
@@ -88,8 +89,11 @@ var MAT = {
   muro:       new THREE.MeshLambertMaterial({color:0x2a1519, side:THREE.DoubleSide}),
   antepecho:  new THREE.MeshLambertMaterial({color:0x6b2226, side:THREE.DoubleSide}),
   oro:        new THREE.MeshLambertMaterial({color:0xc9922f, emissive:0x2a1c05, side:THREE.DoubleSide}),
-  bronceAplique:new THREE.MeshPhongMaterial({color:0x6f552b, emissive:0x120b03,
-                 shininess:24, side:THREE.DoubleSide}),
+  // El mismo mapa actúa como color y microrrelieve: así el grano de
+  // fundición se conserva en placa, brazos, copas y cadenas pequeñas.
+  bronceAplique:new THREE.MeshPhongMaterial({map:texBronceAplique,
+                 bumpMap:texBronceAplique,bumpScale:0.008,color:0xb28d59,
+                 emissive:0x120b03,shininess:24,side:THREE.DoubleSide}),
   vidrioAplique:new THREE.MeshPhongMaterial({color:0xd8d1bd, emissive:0x3a3529,
                  transparent:true, opacity:0.82, shininess:55}),
   yeso:       new THREE.MeshLambertMaterial({color:0xd8c9a8, side:THREE.DoubleSide}),

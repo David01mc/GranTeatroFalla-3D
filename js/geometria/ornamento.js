@@ -130,27 +130,68 @@ function construirMamparaArcos(ancho,alto,nVanos){
   return grupo;
 }
 
-/* Balaustre plano inspirado en las vallas caladas tradicionales: cuello
-   estrecho, cuerpo romboidal y pequeños ensanchamientos en los extremos.
-   Se extruye muy poco para conservar el aspecto de pieza recortada. */
+/* Módulo de celosía inspirado en la valla histórica: no es un balaustre
+   aislado, sino una pieza continua con rombos entrelazados arriba,
+   volutas alrededor de un óvalo central y calados lanceolados abajo.
+   Los biseles escalonados hacen legibles las molduras concéntricas. */
 function geometriaBalaustreOrnamental(alto){
-  var h=alto, niveles=[0,0.08,0.16,0.42,0.50,0.58,0.84,0.92,1];
-  var anchos=[0.05,0.07,0.035,0.09,0.115,0.09,0.035,0.07,0.05];
-  var s=new THREE.Shape(), i;
-  s.moveTo(-anchos[0],niveles[0]*h);
-  for(i=1;i<niveles.length;i++) s.lineTo(-anchos[i],niveles[i]*h);
-  for(i=niveles.length-1;i>=0;i--) s.lineTo(anchos[i],niveles[i]*h);
-  s.closePath();
-  // Pequeño calado ovalado en el corazón de cada pieza, centrado en su
-  // zona más ancha y con margen suficiente de madera a ambos lados.
-  var hueco=new THREE.Path();
-  hueco.absellipse(0,h*0.50,0.038,h*0.105,0,Math.PI*2,true);
-  s.holes.push(hueco);
-  var g=new THREE.ExtrudeGeometry(s,{
-    depth:0.055, bevelEnabled:true, bevelThickness:0.008,
-    bevelSize:0.008, bevelSegments:1
+  var h=alto,w=0.34,s=new THREE.Shape();
+  s.moveTo(-w/2,0);s.lineTo(w/2,0);s.lineTo(w/2,h);s.lineTo(-w/2,h);s.closePath();
+
+  function huecoPoligono(puntos){
+    var p=new THREE.Path();p.moveTo(puntos[0][0],puntos[0][1]*h);
+    for(var i=1;i<puntos.length;i++)p.lineTo(puntos[i][0],puntos[i][1]*h);
+    p.closePath();s.holes.push(p);
+  }
+  // Dos octógonos inclinados; sus vértices interiores forman la X alta.
+  [-1,1].forEach(function(lado){
+    var cx=lado*0.083,cy=0.805,rx=0.069,ry=0.145,c=0.012;
+    huecoPoligono([
+      [cx-rx+c,cy+ry],[cx+rx-c,cy+ry],[cx+rx,cy+ry-c/h],
+      [cx+rx,cy-ry+c/h],[cx+rx-c,cy-ry],[cx-rx+c,cy-ry],
+      [cx-rx,cy-ry+c/h],[cx-rx,cy+ry-c/h]
+    ]);
   });
-  g.translate(0,0,-0.0275);
+
+  // Óvalo central, rodeado por cuatro brazos que conectan las volutas.
+  var centro=new THREE.Path();
+  centro.absellipse(0,h*0.485,0.038,h*0.086,0,Math.PI*2,true);s.holes.push(centro);
+
+  // Huecos en forma de corazón/voluta a ambos lados del medallón.
+  [-1,1].forEach(function(lado){
+    var p=new THREE.Path();
+    p.moveTo(lado*0.047,h*0.52);
+    p.bezierCurveTo(lado*0.076,h*0.675,lado*0.158,h*0.67,lado*0.151,h*0.54);
+    p.bezierCurveTo(lado*0.147,h*0.445,lado*0.082,h*0.395,lado*0.047,h*0.44);
+    p.bezierCurveTo(lado*0.072,h*0.475,lado*0.078,h*0.545,lado*0.047,h*0.52);
+    p.closePath();s.holes.push(p);
+  });
+
+  // Calados inferiores sinuosos: estrechos en el centro y abiertos en
+  // los extremos, como las hojas enfrentadas de la fotografía.
+  [-1,1].forEach(function(lado){
+    var p=new THREE.Path();
+    p.moveTo(lado*0.027,h*0.395);
+    p.bezierCurveTo(lado*0.072,h*0.38,lado*0.147,h*0.35,lado*0.151,h*0.25);
+    p.bezierCurveTo(lado*0.158,h*0.115,lado*0.108,h*0.045,lado*0.046,h*0.025);
+    p.bezierCurveTo(lado*0.075,h*0.145,lado*0.066,h*0.285,lado*0.027,h*0.395);
+    p.closePath();s.holes.push(p);
+  });
+
+  // Pequeños calados de transición que separan las volutas de la X.
+  [-1,1].forEach(function(lado){
+    var p=new THREE.Path();
+    p.absellipse(lado*0.124,h*0.685,0.027,h*0.043,0,Math.PI*2,true);s.holes.push(p);
+  });
+  // Un séptimo calado aligera el eje inferior, que antes seguía leyendo
+  // como una barra maciza al contemplar la valla desde la platea.
+  var gotaInferior=new THREE.Path();
+  gotaInferior.absellipse(0,h*0.185,0.018,h*0.068,0,Math.PI*2,true);s.holes.push(gotaInferior);
+  var g=new THREE.ExtrudeGeometry(s,{
+    depth:0.038, bevelEnabled:true, bevelThickness:0.005,
+    bevelSize:0.004, bevelSegments:1,curveSegments:6
+  });
+  g.translate(0,0,-0.019);
   return g;
 }
 

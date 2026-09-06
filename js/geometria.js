@@ -847,7 +847,9 @@ function barandillaPalco(escena, borde, yBase, alto, recortaEnMampara){
     escena.add(new THREE.Mesh(geoPasamanos,MAT.terciopeloPasamanos));
   }
   var altoBal=Math.max(0.30,alto-0.17), geoBal=geometriaBalaustreOrnamental(altoBal);
-  var separacion=0.34, transforms=[];
+  // Cada pieza es ahora un módulo de celosía ancho y enlazado, no un
+  // balaustre aislado; esta cadencia deja una junta mínima entre módulos.
+  var separacion=0.35, transforms=[];
   for(var i=0;i<borde.length-1;i++){
     var a=borde[i], b=borde[i+1], dx=b.x-a.x, dz=b.z-a.z;
     var largo=Math.hypot(dx,dz), cantidad=Math.max(1,Math.round(largo/separacion));
@@ -1096,17 +1098,27 @@ function apliqueEntresuelo(){
 }
 
 function apliquesEntresuelo(escena,borde,plan,ini,fin,nCeldas,yCentro){
-  var idx=indicesPorLongitud(plan,ini,fin,nCeldas);
+  var idx=indicesPorLongitud(plan,ini,fin,nCeldas),prototipo=apliqueEntresuelo();
   for(var c=0;c<nCeldas;c++){
     var i=Math.round((idx[c]+idx[c+1])/2),p=borde[i],q=plan[i];
     var qa=plan[idx[c]],qb=plan[idx[c+1]],nx=p.x-q.x,nz=p.z-q.z,nl=Math.hypot(nx,nz)||1;
-    var a=apliqueEntresuelo();
+    var a=new THREE.Object3D();
     // Ocho centímetros hacia el patio evitan que la placa se funda con
     // el frente curvo y permiten leer el volumen de brazos y tulipas.
     a.position.set(p.x+nx/nl*0.08,yCentro,p.z+nz/nl*0.08);
     a.rotation.y=-Math.atan2(qb.z-qa.z,qb.x-qa.x);
-    escena.add(a);
+    /* Se aplanan las piezas del grupo sobre la escena. El fusionador del
+       final puede reunir así todos los bronces en una malla y todos los
+       vidrios en otra; mantener 22 grupos suponía cientos de draw calls. */
+    a.updateMatrix();
+    prototipo.children.forEach(function(pieza){
+      pieza.updateMatrix();
+      var matrizMundo=new THREE.Matrix4().multiplyMatrices(a.matrix,pieza.matrix);
+      var malla=new THREE.Mesh(pieza.geometry.clone().applyMatrix4(matrizMundo),pieza.material);
+      escena.add(malla);
+    });
   }
+  prototipo.children.forEach(function(pieza){pieza.geometry.dispose();});
 }
 
 /* Puertas reales de los antepalcos: cada hoja conserva su propia bisagra

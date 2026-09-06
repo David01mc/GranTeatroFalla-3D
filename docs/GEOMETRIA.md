@@ -65,7 +65,7 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | `indicesPorLongitud` | Divide un tramo curvo en palcos de longitud semejante. |
 | `posteYesoEnIndice` | Separador bajo ondulado entre dos palcos. |
 | `separadoresPalco` | Distribuye los separadores de un grupo de palcos. |
-| `geometriaBalaustreOrnamental` | Pieza calada individual de la barandilla. |
+| `geometriaBalaustreOrnamental` | Módulo continuo y fino de celosía con octógonos entrelazados, volutas, medallón oval y siete calados; usa una extrusión de 38 mm y bisel ligero para reducir masa y polígonos. |
 | `barandillaPalco` | Zócalo, balaustres y pasamanos de una barandilla. |
 | `tramosPlateaSinSalidas` | Corta una curva en los accesos 1 y 5. |
 | `barandillaPlateaConSalidas` | Barandilla de platea dejando libres ambos accesos. |
@@ -73,8 +73,8 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | `geometriaCortinaPalco` | Hoja recogida de terciopelo de una portada. |
 | `columnaMudejar` | Columna completa compartida entre arcos. |
 | `portadasPalcosPlatea` | Arcos, paños superiores, dientes, adornos, columnas y cortinas; admite una cota de techo para reutilizar la misma portada en platea y principal. |
-| `apliqueEntresuelo` | Aplique volumétrico de bronce envejecido con dos brazos, globos opalinos y lágrimas colgantes. |
-| `apliquesEntresuelo` | Distribuye un aplique bajo el centro de cada palco lateral del piso principal. |
+| `apliqueEntresuelo` | Aplique volumétrico con textura y microrrelieve de bronce envejecido, dos brazos, globos opalinos y lágrimas colgantes. |
+| `apliquesEntresuelo` | Distribuye un aplique bajo cada palco y aplana sus piezas para que el fusionador las reduzca finalmente a una malla de bronce y otra de vidrio. |
 | `antepalcosPlatea` | Extensión posterior de 2 m, tabiques y puertas de cada palco. |
 | `pasilloCurvoPalcos` | Corredor curvo común situado detrás de los antepalcos. |
 | `enNivelPalcos` | Contorno transitable de los pisos elevados; permite conservar la cota principal al abandonar la escalera. |
