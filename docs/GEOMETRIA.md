@@ -14,9 +14,9 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | `cinta` | Pared vertical que sigue una polilínea. Se usa en zócalos, muros, frentes y faldones. |
 | `banda` | Superficie entre dos polilíneas. Construye suelos, rellanos y cornisas planas. |
 | `superficie` | Superficie poligonal general; se usa principalmente para patio y techo. |
-| `alfombra` | Cinta texturizada que sigue un eje, con anchura fija o calculada por punto. |
-| `alfombraVariable` | Alfombra cuyo ancho se proporciona explícitamente en cada vértice. |
+| `alfombra` | Cinta texturizada que sigue un eje. La anchura puede ser un número o una función del punto, y la altura se apoya en la rampa posterior donde la hay. |
 | `enlaceAlfombra` | Trapecio que une alfombras con orientaciones o anchuras distintas. |
+| `remuestreaLinea` | Reparte una polilínea en N puntos equidistantes por longitud de arco. Es lo que permite emparejar dos curvas de distinta densidad en una `banda` sin que los cuadriláteros salgan sesgados. |
 
 ## Patio de butacas y pasillos
 
@@ -106,6 +106,37 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 - las luces generales y las luces auxiliares de los palcos frontales.
 
 La API pública queda expuesta como `FALLA.escena.construir`. Las puertas se publican mediante `FALLA.puertas` y el telón mediante `FALLA.telon`.
+
+## Encuentro entre la platea y las alfombras de salida
+
+Es la zona más entrelazada del archivo: valla, suelo, canto y mamparas comparten los mismos puntos, y tocarlos por separado los descuadra.
+
+| Función | Objeto o responsabilidad |
+| --- | --- |
+| `enHuecoRampa` | Único criterio de «este punto cae dentro del paso de la rampa». Lo consultan la valla, el remate del suelo y las mamparas. |
+| `tramosPlateaSinSalidas` | Parte la curva de la barandilla en los dos huecos, cortando el segmento en el punto exacto del borde (por bisección) en vez de descartar vértices enteros. Devuelve además, en sus extremos, los cuatro bordes de hueco que usan las mamparas. |
+| `construirMamparaArcos` | Mampara mudéjar parametrizable: ancho, alto libre y número de vanos. Ornamenta ambas caras, porque es una pieza exenta. |
+| `mamparasEscaleras` | Dos mamparas de tres vanos en el desembarco de las escaleras laterales, sobre la radial del palco 2. |
+| `mamparasRampas` | Cuatro mamparas que separan los palcos de las alfombras, una por flanco de cada rampa. Se resuelven en módulos de un vano tangentes al borde real de la alfombra, para acompañar su curvatura. |
+
+## Constantes de la geometría
+
+| Constante | Qué gobierna |
+| --- | --- |
+| `ASIENTO_PASO`, `FILA_PASO` | Separación entre butacas de una fila y entre filas. |
+| `PASILLO_CENTRAL`, `PASILLO_LATERAL` | Anchura de los pasillos centrales y de los que van junto a los muros. |
+| `Z_FILA1` | Profundidad de la primera fila, origen del patio. |
+| `FILAS_CENTRO`, `ASIENTOS_CENTRO`, `FILAS_LATERAL`, `ASIENTOS_LATERAL` | Recuento de butacas por bloque; `ASIENTOS_LATERAL` da el número de cada fila. |
+| `CENTRO_MEDIO`, `LATERAL_DENTRO` | Semianchura del bloque central y borde interior de los laterales. Derivadas, no se editan sueltas. |
+| `SITIOS_BUTACAS` | Lista ya calculada de todas las posiciones de butaca (centro más los dos laterales). Se resuelve una sola vez al cargar y la reutilizan tanto el instanciado de `butacas` como la colisión del modo paseo. |
+| `RESERVA_TECNICA_MEDIA` | Semianchura reservada al fondo para los cinco vanos técnicos. Debe superar el borde exterior del último arco, o la última portada de palco lo invade. |
+| `ANCHO_FRONTAL`, `DESPLAZAMIENTO_FRONTAL_X` | Fondo del palco frontal y su retranqueo hacia el muro lateral. |
+| `RETIRO_ESCENARIO_Z` | Franja reservada delante del escenario para el foso. |
+| `Z_CORREDOR_INI`, `Z_CORREDOR_FIN` | Límites del pasillo transversal; marcan también dónde arranca el ala de platea. |
+| `ALTO_BRAZO` | Altura del brazo de butaca, algo por encima del cojín. |
+| `TELON_ANCHO`, `TELON_ALTO`, `TELON_Z`, `TELON_X_ABIERTO`, `TELON_DURACION` | Dimensiones, posición y tiempo de apertura del telón. |
+| `FONDO_MAMPARA` | Espesor de las mamparas. Único mando: lo usan la extrusión, el fondo de las jambas y el retranqueo de media pieza contra la alfombra. |
+| `HOLGURA_VALLA_ALFOMBRA` | Separación entre la valla y el borde visible de la alfombra. Único mando para acercarla o separarla; a cero, la curva de la valla cae justo sobre el borde. |
 
 ## Regla para futuras modificaciones
 

@@ -92,25 +92,6 @@ function alfombra(pts, ancho, mat){
   return new THREE.Mesh(g,mat);
 }
 
-/* Variante con un ancho distinto en cada punto, usada para ensanchar
-   suavemente el pasillo transversal al llegar a las escaleras. */
-function alfombraVariable(pts,anchos,mat){
-  var g=new THREE.BufferGeometry(),pos=[],uv=[],idx=[],dist=0;
-  for(var i=0;i<pts.length;i++){
-    var p=pts[i],a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)];
-    var tx=b.x-a.x,tz=b.z-a.z,L=Math.hypot(tx,tz)||1;tx/=L;tz/=L;
-    var nx=-tz,nz=tx,w=anchos[i]/2,y=geo.rake(p.z)+0.08;
-    pos.push(p.x-nx*w,y,p.z-nz*w,p.x+nx*w,y,p.z+nz*w);
-    if(i>0)dist+=Math.hypot(p.x-pts[i-1].x,p.z-pts[i-1].z);
-    uv.push(0,dist*0.6,1,dist*0.6);
-  }
-  for(i=0;i<pts.length-1;i++){var o=i*2;idx.push(o,o+1,o+2,o+1,o+3,o+2);}
-  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
-  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
-  g.setIndex(idx);g.computeVertexNormals();
-  return new THREE.Mesh(g,mat);
-}
-
 /* Trapecio de enlace cuyos testeros permanecen paralelos al borde del
    pasillo y al primer escalón, aunque sus centros no estén alineados. */
 function enlaceAlfombra(x0,z0,w0,x1,z1,w1,mat){
@@ -699,8 +680,14 @@ function escalerasLaterales(){
   return g;
 }
 
-/* Mampara de tres arcos: parte inferior maciza, como en la referencia, y
-   tres vanos por los que se ve la sala. Se arma a la medida que se pida
+/* Espesor de las mamparas. Único mando: lo usan tanto la extrusión de la
+   pantalla y el fondo de sus jambas como el retranqueo de media pieza con
+   el que se apoyan contra el borde de la alfombra, así que tocarlo aquí
+   los mantiene cuadrados entre sí. */
+var FONDO_MAMPARA = 0.09;
+
+/* Mampara de arcos: parte inferior maciza, como en la referencia, y los
+   vanos que se pidan, por los que se ve la sala. Se arma a la medida
    —el alto libre no es el mismo en el desembarco de las escaleras que
    bajo el forjado del piso principal—, centrada en el origen y de cara a
    +Z, lista para girarla sobre su radial. Las proporciones de arranque,
@@ -728,31 +715,58 @@ function construirMamparaArcos(ancho,alto,nVanos){
 
   // El espesor atraviesa el borde del palco por ambos lados: el eje se
   // mantiene en la junta exacta y el solape no abre un pasillo paralelo.
-  var fondoMampara=0.16;
-  var geoPantalla=new THREE.ExtrudeGeometry(forma,{depth:fondoMampara,bevelEnabled:true,bevelThickness:0.018,bevelSize:0.018,bevelSegments:1});
+  var fondoMampara=FONDO_MAMPARA;
+  var geoPantalla=new THREE.ExtrudeGeometry(forma,{depth:fondoMampara,bevelEnabled:true,bevelThickness:0.010,bevelSize:0.010,bevelSegments:1});
   geoPantalla.translate(0,0,-fondoMampara/2);
   grupo.add(new THREE.Mesh(geoPantalla,MAT.mudejarGeometrico));
 
-  // Moldura de cada vano: jambas finas y arco superior dentado.
-  var cara=fondoMampara/2;
+  // Moldura de cada vano: jambas finas y arco superior dentado. Va en las
+  // dos caras, porque la mampara se ve por igual desde el palco y desde la
+  // alfombra: ornamentar sólo una dejaba el reverso liso mirase por donde
+  // mirase, que es justo lo que no puede pasar en una pieza exenta.
+  // Todos los vanos de una mampara miden lo mismo, así que las cuatro
+  // piezas comparten geometría y sólo cambia su posición: se instancian en
+  // una malla por tipo en vez de una malla por pieza y cara. El arco se
+  // construye centrado en el origen para poder trasladarlo como los demás.
+  var cara=fondoMampara/2, jambas=[], arcos=[], paneles=[], rombos=[];
   for(n=0;n<nVanos;n++){
     izquierda=-ancho/2+margen+n*(anchoVano+separacion); derecha=izquierda+anchoVano;
     var centro=(izquierda+derecha)/2;
-    [izquierda,derecha].forEach(function(xj){
-      var jamba=new THREE.Mesh(new THREE.BoxGeometry(0.045,altoArranque-base,0.16),MAT.mudejarArcos);
-      jamba.position.set(xj,(base+altoArranque)/2,cara+0.025); grupo.add(jamba);
+    [1,-1].forEach(function(lado){
+      jambas.push({x:izquierda,y:(base+altoArranque)/2,z:lado*(cara+0.025)});
+      jambas.push({x:derecha,  y:(base+altoArranque)/2,z:lado*(cara+0.025)});
+      arcos.push({x:centro,y:0,z:lado*(cara+0.025)});
+      paneles.push({x:centro,y:base/2,z:lado*(cara+0.035)});
+      rombos.push({x:centro,y:base/2,z:lado*(cara+0.065)});
     });
-    var curva=new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(izquierda,altoArranque,cara+0.025),
-      new THREE.Vector3(centro,2*altoClave-altoArranque,cara+0.025),
-      new THREE.Vector3(derecha,altoArranque,cara+0.025)
-    );
-    grupo.add(new THREE.Mesh(new THREE.TubeGeometry(curva,14,0.045,6,false),MAT.mudejarArcos));
-    var panelBajo=new THREE.Mesh(new THREE.BoxGeometry(anchoVano-0.07,Math.max(0.10,base-0.16),0.035),MAT.maderaBlanca);
-    panelBajo.position.set(centro,base/2,cara+0.035); grupo.add(panelBajo);
-    var rombo=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.22,0.028),MAT.oro);
-    rombo.position.set(centro,base/2,cara+0.065); rombo.rotation.z=Math.PI/4; grupo.add(rombo);
   }
+
+  var curvaArco=new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(-anchoVano/2,altoArranque,0),
+    new THREE.Vector3(0,2*altoClave-altoArranque,0),
+    new THREE.Vector3(anchoVano/2,altoArranque,0)
+  );
+  [{lista:jambas,  mat:MAT.mudejarArcos, giroZ:0,
+    geometria:new THREE.BoxGeometry(0.045,altoArranque-base,fondoMampara)},
+   {lista:arcos,   mat:MAT.mudejarArcos, giroZ:0,
+    geometria:new THREE.TubeGeometry(curvaArco,14,0.045,6,false)},
+   {lista:paneles, mat:MAT.maderaBlanca, giroZ:0,
+    geometria:new THREE.BoxGeometry(anchoVano-0.07,Math.max(0.10,base-0.16),0.035)},
+   {lista:rombos,  mat:MAT.oro, giroZ:Math.PI/4,
+    geometria:new THREE.BoxGeometry(0.22,0.22,0.028)}
+  ].forEach(function(pieza){
+    var malla=new THREE.InstancedMesh(pieza.geometria,pieza.mat,pieza.lista.length);
+    var matriz=new THREE.Matrix4(), quat=new THREE.Quaternion(), pos=new THREE.Vector3();
+    var escala=new THREE.Vector3(1,1,1);
+    quat.setFromAxisAngle(new THREE.Vector3(0,0,1),pieza.giroZ);
+    pieza.lista.forEach(function(t,k){
+      pos.set(t.x,t.y,t.z);
+      matriz.compose(pos,quat,escala);
+      malla.setMatrixAt(k,matriz);
+    });
+    malla.instanceMatrix.needsUpdate=true;
+    grupo.add(malla);
+  });
   return grupo;
 }
 
@@ -791,7 +805,7 @@ function mamparasEscaleras(){
    real de la alfombra en su tramo—, de modo que los tres arcos juntos
    acompañan la curva en lugar de cortarla en recto. */
 function mamparasRampas(){
-  var conjunto=new THREE.Group(), fondoMampara=0.16;
+  var conjunto=new THREE.Group(), fondoMampara=FONDO_MAMPARA;
   // Alto libre bajo el forjado del piso principal: el mismo que usan los
   // cinco arcos del fondo técnico, para que la fachada lea como una sola.
   var alto=P.pisos[1].y-geo.platea.altura-0.02;
@@ -810,28 +824,24 @@ function mamparasRampas(){
    {signo: 1, exterior:false, arranque:bordes[1]},
    {signo:-1, exterior:false, arranque:bordes[2]},
    {signo:-1, exterior:true,  arranque:bordes[3]}].forEach(function(lado){
-    var curva=bordeAlfombraPasillo(lado.signo,lado.exterior,lado.arranque.z);
+    // Arranca en el propio borde del hueco, que es donde termina la
+    // barandilla: el primer punto del borde de la alfombra cae medio metro
+    // más atrás y dejaba los arcos despegados de ella. Sólo se admiten
+    // puntos que avanzan hacia el fondo, porque al pasar del eje de la
+    // alfombra a su borde el primero retrocede en z.
+    var curva=[lado.arranque];
+    bordeAlfombraPasillo(lado.signo,lado.exterior,lado.arranque.z).forEach(function(p){
+      if(p.z>curva[curva.length-1].z+0.02) curva.push(p);
+    });
     if(curva.length<2) return;
-    // Longitud acumulada: los tres vanos se reparten sobre el recorrido
-    // real de la alfombra, no sobre su proyección recta.
-    var acumulado=[0], total=0, i;
-    for(i=1;i<curva.length;i++){
-      total+=Math.hypot(curva[i].x-curva[i-1].x,curva[i].z-curva[i-1].z);
-      acumulado.push(total);
-    }
-    if(total<0.60) return;
-    function puntoEn(s){
-      for(var j=1;j<acumulado.length;j++){
-        if(acumulado[j]>=s){
-          var u=(s-acumulado[j-1])/((acumulado[j]-acumulado[j-1])||1);
-          return {x:curva[j-1].x+(curva[j].x-curva[j-1].x)*u,
-                  z:curva[j-1].z+(curva[j].z-curva[j-1].z)*u};
-        }
-      }
-      return curva[curva.length-1];
-    }
+    // Los tres vanos se reparten sobre el recorrido real de la alfombra y
+    // no sobre su proyección recta: los cuatro puntos de corte salen
+    // equidistantes por longitud de arco. Un recorrido demasiado corto no
+    // necesita descarte propio, porque deja los tres módulos por debajo
+    // del mínimo que ya filtra el bucle.
+    var cortes=remuestreaLinea(curva,4);
     for(var m=0;m<3;m++){
-      var a=puntoEn(total*m/3), b=puntoEn(total*(m+1)/3);
+      var a=cortes[m], b=cortes[m+1];
       var dx=b.x-a.x, dz=b.z-a.z, L=Math.hypot(dx,dz);
       if(L<0.20) continue;
       var mx=(a.x+b.x)/2, mz=(a.z+b.z)/2, nx=-dz/L, nz=dx/L;
