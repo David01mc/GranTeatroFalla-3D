@@ -104,6 +104,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/parametros.js"></script>
 <script src="js/materiales.js"></script>
+<!-- Piezas reutilizables: deben cargarse antes que geometria.js, que las
+     recoge de FALLA.piezas al ejecutarse. -->
+<script src="js/geometria/primitivas.js"></script>
+<script src="js/geometria/mobiliario.js"></script>
+<script src="js/geometria/ornamento.js"></script>
 <script src="js/geometria.js"></script>
 <script src="js/camara-orbit.js"></script>
 <script src="js/paseo.js"></script>
