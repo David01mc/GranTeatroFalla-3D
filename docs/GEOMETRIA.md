@@ -56,6 +56,7 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | `mamparasEscaleras` | Mamparas mudéjares de tres arcos junto al palco 2. |
 | `texturaSalida` | Cartel generado para “SALIDA / EXIT”. |
 | `salidasEscalerasPasillo` | Rellanos que comunican las escaleras con el corredor posterior. |
+| `cajaEscaleraPrimerPiso` | Caja de escalera de un ala (`signo` = ±1). Cuelga del flanco sur del pasillo EXIT y ocupa su mismo tramo de x, así que se abre de frente nada más salir: tres vuelos alfombrados con sus rellanos, barandilla del hueco y pretil del desembarco, hasta la cota del primer piso. El vuelo que desembarca queda pegado al muro del teatro, que es por donde tendrá que abrirse el paso al piso principal. |
 
 ## Palcos de platea
 
@@ -117,7 +118,7 @@ Es la zona más entrelazada del archivo: valla, suelo, canto y mamparas comparte
 | `tramosPlateaSinSalidas` | Parte la curva de la barandilla en los dos huecos, cortando el segmento en el punto exacto del borde (por bisección) en vez de descartar vértices enteros. Devuelve además, en sus extremos, los cuatro bordes de hueco que usan las mamparas. |
 | `construirMamparaArcos` | Mampara mudéjar parametrizable: ancho, alto libre y número de vanos. Ornamenta ambas caras, porque es una pieza exenta. |
 | `mamparasEscaleras` | Dos mamparas de tres vanos en el desembarco de las escaleras laterales, sobre la radial del palco 2. |
-| `mamparasRampas` | Cuatro mamparas que separan los palcos de las alfombras, una por flanco de cada rampa. Se resuelven en módulos de un vano tangentes al borde real de la alfombra, para acompañar su curvatura. |
+| `mamparasRampas` | Cuatro mamparas que separan los palcos de las alfombras, una por flanco de cada rampa. Se resuelven en módulos de un vano tangentes al borde real de la alfombra y se recortan contra el plano tangente del arco de salida, sin invadir el corredor posterior. |
 
 ## Constantes de la geometría
 
@@ -137,6 +138,7 @@ Es la zona más entrelazada del archivo: valla, suelo, canto y mamparas comparte
 | `TELON_ANCHO`, `TELON_ALTO`, `TELON_Z`, `TELON_X_ABIERTO`, `TELON_DURACION` | Dimensiones, posición y tiempo de apertura del telón. |
 | `FONDO_MAMPARA` | Espesor de las mamparas. Único mando: lo usan la extrusión, el fondo de las jambas y el retranqueo de media pieza contra la alfombra. |
 | `HOLGURA_VALLA_ALFOMBRA` | Separación entre la valla y el borde visible de la alfombra. Único mando para acercarla o separarla; a cero, la curva de la valla cae justo sobre el borde. |
+| `CAJA_ESCALERA` | Planta, boca, pretil, vuelos, rellanos, huella, contrahuella y cotas de la caja de escalera al primer piso. Su `xMax` marca además dónde termina el pasillo EXIT (`salidasEscalerasPasillo` y `enSalidaPasillo` lo leen de aquí), para que pasillo y caja topen sin rincones muertos. Fuente única: de aquí salen tanto la geometría visible como las colisiones, y todo se deriva de `W`, `HUELLA` y `PELDANOS`, de modo que la escalera sigue cuadrando si se cambian. Definida en x positivo; `alturaCajaEscalera` trabaja sobre `\|x\|` y ambas alas son la misma sala reflejada. |
 
 ## Regla para futuras modificaciones
 

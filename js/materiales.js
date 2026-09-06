@@ -34,6 +34,10 @@ var texMudejarArcos = textura('Textures/MudejarArcos.webp', 6, 1);
 var texPuertaPalco  = cargador.load('Textures/PuertaPalcoMudejar.webp');
 var texEmbCrema     = textura('Textures/EmbocaduraCrema.webp', 2, 3);
 var texEmbGeometrica= textura('Textures/EmbocaduraGeometrica.webp', 3, 1);
+var texParedPasillo = textura('Textures/ParedPasilloBlanca.webp', 1, 1.5);
+var texMaderaPasillo= textura('Textures/MaderaPasilloGrisOscura.webp', 1, 1);
+var texBaldosaPasillo=textura('Textures/BaldosasPasilloClaras.webp', 1, 1);
+var texTerciopeloPasamanos=textura('Textures/TerciopeloPasamanos.webp', 1, 1);
 
 // La versión WebP ya está desaturada offline: evita crear un canvas y
 // recorrer millones de píxeles durante el arranque.
@@ -47,14 +51,27 @@ var MAT = {
   maderaBlanca:     new THREE.MeshLambertMaterial({map:texMaderaBlanca, color:0xb0a99b, side:THREE.DoubleSide}),
   maderaPlatea:     new THREE.MeshLambertMaterial({map:texMaderaPlatea, side:THREE.DoubleSide}),
   terciopelo2:      new THREE.MeshLambertMaterial({map:texTerciopelo2, side:THREE.DoubleSide}),
+  terciopeloPasamanos:new THREE.MeshLambertMaterial({map:texTerciopeloPasamanos,
+                        color:0x9a7777, side:THREE.DoubleSide}),
   barnizClaro:      new THREE.MeshLambertMaterial({map:texBarnizClaro, color:0x8f8a80}),
   mudejarGeometrico:new THREE.MeshLambertMaterial({map:texMudejarGeo, color:0xbdb4a3, side:THREE.DoubleSide}),
   mudejarFloral:    new THREE.MeshLambertMaterial({map:texMudejarFloral, color:0xb8ae9c}),
   mudejarArcos:     new THREE.MeshLambertMaterial({map:texMudejarArcos, color:0xbdb3a1}),
-  puertaPalco:      new THREE.MeshLambertMaterial({map:texPuertaPalco}),
+  // Mantiene el relieve ornamental fotografiado, oscurecido al acabado
+  // gris-marrón de la carpintería del corredor histórico.
+  puertaPalco:      new THREE.MeshLambertMaterial({map:texPuertaPalco, color:0x77716d}),
   embocaduraCrema:  new THREE.MeshLambertMaterial({map:texEmbCrema, color:0xc8b89d, side:THREE.DoubleSide}),
   embocaduraGeo:    new THREE.MeshLambertMaterial({map:texEmbGeometrica, color:0x9a8175, side:THREE.DoubleSide}),
   suelo:      new THREE.MeshLambertMaterial({color:0x3a2118, side:THREE.DoubleSide}),
+  // Mapas repetibles propios del corredor: yeso fino, baldosa mineral y
+  // madera teñida. El color solo modula levemente la fotografía base.
+  paredPasillo:new THREE.MeshLambertMaterial({map:texParedPasillo, color:0xf2f2ee, side:THREE.DoubleSide}),
+  // Velo situado solo en la cara del antepalco orientada a la sala.
+  // Conserva el grano del yeso inferior y simula la penumbra del fondo.
+  sombraAntepalco:new THREE.MeshBasicMaterial({color:0x21191a, transparent:true,
+                    opacity:0.48, side:THREE.DoubleSide, depthWrite:false}),
+  sueloPasillo:new THREE.MeshLambertMaterial({map:texBaldosaPasillo, color:0xd6d6d0, side:THREE.DoubleSide}),
+  zocaloPasillo:new THREE.MeshLambertMaterial({map:texMaderaPasillo, color:0x8a8a86, side:THREE.DoubleSide}),
   parquet:    new THREE.MeshLambertMaterial({map:texParquet, side:THREE.DoubleSide}),
   parquetPlatea:new THREE.MeshLambertMaterial({map:texParquetPlatea, side:THREE.DoubleSide}),
   // polygonOffset empuja la alfombra hacia la cámara en el buffer de

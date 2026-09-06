@@ -18,6 +18,7 @@ var P = {
   rake: 0.030,       // pendiente del patio (3 cm por metro, aprox. 1.7 grados)
   zRake: 2.0,
   altura: 13.4,      // hasta el techo de Abárzuza
+  anchoPasilloPalcos: 3.90, // corredor posterior (antes 3.00 m; +30 %)
   pisos: [           // y del piso, y del antepecho, retranqueo, nº de palcos
     {y:0.00, alto:1.15, dentro:2.90, palcos:0, palcosLado:9, nombre:'platea'},
     {y:4.10, alto:1.15, dentro:2.10, palcos:22, palcosLado:11, nombre:'principal'},
@@ -147,8 +148,105 @@ function dentroDePlanta(x,z){
 var plateaAltura=rake(P.zc+P.Rz)+0.40;
 var BORDE_PLATEA=dentro(PLAN,P.pisos[0].dentro);
 var EXTERIOR_ANTEPALCO=dentro(PLAN,-2.0);
-// El antepalco termina a -2 m y el corredor común añade otros 3 m.
-var EXTERIOR_PASILLO=dentro(PLAN,-5.0);
+// El antepalco termina a -2 m; desde ahí se mide el corredor posterior.
+var EXTERIOR_PASILLO=dentro(PLAN,-(2.0+P.anchoPasilloPalcos));
+
+/* Caja de escalera de acceso al primer piso, anexa a cada extremo del
+   corredor posterior. La planta reproduce el boceto: la caja cuelga al
+   sur del pasillo EXIT y ocupa su mismo tramo de x, de modo que se abre
+   de frente nada más salir —no pasado el cartel—, con tres vuelos
+   girando alrededor de un hueco central: sube por el lado de fuera,
+   cruza al fondo y vuelve por el lado del teatro hasta desembarcar a la
+   cota del primer piso, pegado al muro por el que algún día se entrará
+   al piso principal.
+
+   Está definida para el ala derecha (x positivo). alturaCajaEscalera
+   trabaja sobre |x| y la geometría se construye dos veces, con signo,
+   de modo que ambas alas comparten estas mismas cotas. */
+var CAJA_ESCALERA=(function(){
+  var W=2.10;                    // ancho de vuelo y de rellano
+  var HUELLA=0.32, PELDANOS=6;
+  var CORRIDA=HUELLA*PELDANOS;   // 1.92 m de proyección horizontal por vuelo
+  var y0=plateaAltura, y3=P.pisos[1].y;
+  var paso=(y3-y0)/(3*PELDANOS); // ≈0.16 m de contrahuella
+  var y1=y0+paso*PELDANOS, y2=y0+paso*2*PELDANOS;
+
+  // xMin deja libre el paño lateral de la embocadura, que cierra el muro
+  // frontal de la sala y se extiende hasta x=15.50 en z −2.66..−1.14 —
+  // justo la franja que ocupa el vuelo transversal de esta caja.
+  var xMin=15.70;
+  var xBaja=xMin+W/2;            // eje del vuelo que desembarca, junto al teatro
+  var xSube=xBaja+CORRIDA+W;     // eje del vuelo que arranca, al fondo del pasillo
+  var xMax=xSube+W/2;
+
+  // La boca es la arista norte, compartida con el pasillo EXIT: la caja
+  // se abre a lo ancho de él y su solera enrasa con su suelo.
+  var zBoca=1.80;
+  var zGiro=zBoca-CORRIDA;       // fin del vuelo de subida
+  var zMin=zGiro-W;              // testero sur
+  var zCruce=zGiro-W/2;          // eje del vuelo transversal
+
+  return {
+    xMin:xMin, xMax:xMax, zMin:zMin, zMax:zBoca,
+    // La arista norte entera queda abierta: el pasillo EXIT se alarga
+    // justo hasta xMax para topar con la caja, sin rincones muertos.
+    boca:{xMin:xMin, xMax:xMax},
+    // El pretil del desembarco invade el pasillo: sin él se saldría del
+    // último peldaño al vacío, 2.88 m más abajo.
+    pretil:{xMin:xMin, xMax:xBaja+W/2, z:zBoca, grosor:0.22},
+    anchoTramo:W, peldanos:PELDANOS, huella:HUELLA, contrahuella:paso,
+    baseY:y0, primerPisoY:y3,
+    tramos:[
+      {x0:xSube,     z0:zBoca,  x1:xSube,     z1:zGiro, y0:y0, y1:y1},
+      {x0:xSube-W/2, z0:zCruce, x1:xBaja+W/2, z1:zCruce, y0:y1, y1:y2},
+      {x0:xBaja,     z0:zGiro,  x1:xBaja,     z1:zBoca, y0:y2, y1:y3}
+    ],
+    rellanos:[
+      {xMin:xSube-W/2, xMax:xMax,      zMin:zMin, zMax:zGiro, y:y1},
+      {xMin:xMin,      xMax:xBaja+W/2, zMin:zMin, zMax:zGiro, y:y2}
+    ],
+    // Las tres aristas que dan al hueco central, para la barandilla.
+    bordesInteriores:[
+      [{x:xSube-W/2,z:zBoca}, {x:xSube-W/2,z:zGiro}],
+      [{x:xSube-W/2,z:zGiro}, {x:xBaja+W/2,z:zGiro}],
+      [{x:xBaja+W/2,z:zGiro}, {x:xBaja+W/2,z:zBoca}]
+    ]
+  };
+})();
+
+function alturaEnTramoCaja(t,x,z){
+  var vx=t.x1-t.x0,vz=t.z1-t.z0,L2=vx*vx+vz*vz;
+  var wx=x-t.x0,wz=z-t.z0,u=(wx*vx+wz*vz)/L2;
+  var lateral=Math.abs(vx*wz-vz*wx)/Math.sqrt(L2);
+  if(u<0 || u>1 || lateral>CAJA_ESCALERA.anchoTramo/2)return null;
+  var escalon=Math.min(CAJA_ESCALERA.peldanos-1,
+    Math.max(0,Math.floor(u*CAJA_ESCALERA.peldanos)));
+  return t.y0+(t.y1-t.y0)*(escalon+1)/CAJA_ESCALERA.peldanos;
+}
+/* ¿Cae el punto en el pretil del desembarco? Es el único obstáculo de
+   la caja que sobresale al pasillo, y hay que descontarlo también de
+   enSalidaPasillo o el pasillo lo volvería pisable. */
+function enPretilCajaEscalera(x,z){
+  var p=CAJA_ESCALERA.pretil, ax=Math.abs(x);
+  return ax>=p.xMin && ax<=p.xMax && z>p.z && z<p.z+p.grosor;
+}
+/* Cota pisable de la caja de escalera. Trabaja sobre |x|: las dos alas
+   son la misma sala reflejada. El hueco central queda a la cota de
+   partida; el último vuelo desemboca asomado al pasillo a +2.88 m, un
+   desnivel que el modo paseo no deja salvar de un paso, así que a él
+   solo se llega dando la vuelta completa, como en una escalera real. */
+function alturaCajaEscalera(x,z){
+  var c=CAJA_ESCALERA, ax=Math.abs(x), i;
+  if(ax<c.xMin || ax>c.xMax || z<c.zMin || z>c.zMax) return null;
+  for(i=0;i<c.rellanos.length;i++){
+    var r=c.rellanos[i];
+    if(ax>=r.xMin && ax<=r.xMax && z>=r.zMin && z<=r.zMax) return r.y;
+  }
+  for(i=0;i<c.tramos.length;i++){
+    var y=alturaEnTramoCaja(c.tramos[i],ax,z); if(y!==null) return y;
+  }
+  return c.baseY;
+}
 function dentroDeContornoAbierto(pts,x,z){
   // El test de rayos cierra implícitamente el último punto con el primero.
   var poly=pts;
@@ -166,7 +264,8 @@ function enPlatea(x,z){
    los dos extremos abiertos del corredor posterior. */
 function enSalidaPasillo(x,z){
   var ax=Math.abs(x);
-  return ax>=ESCALERAS_LATERALES.xAlto-0.05 && ax<=18.65 &&
+  if(enPretilCajaEscalera(x,z)) return false;
+  return ax>=ESCALERAS_LATERALES.xAlto-0.05 && ax<=CAJA_ESCALERA.xMax &&
          z>=ESCALERAS_LATERALES.centroZ-ESCALERAS_LATERALES.ancho/2 &&
          z<=ESCALERAS_LATERALES.centroZ+ESCALERAS_LATERALES.ancho/2+0.08;
 }
@@ -190,6 +289,8 @@ FALLA.geo = {
   distAPlanta: distAPlanta,
   enPlatea: enPlatea,
   enSalidaPasillo: enSalidaPasillo,
+  cajaEscalera:CAJA_ESCALERA,
+  alturaCajaEscalera:alturaCajaEscalera,
   platea: {altura:plateaAltura},
   escalerasLaterales: ESCALERAS_LATERALES,
   alturaEscaleraLateral: alturaEscaleraLateral,

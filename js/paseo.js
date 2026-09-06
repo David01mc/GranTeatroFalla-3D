@@ -36,6 +36,9 @@ function terrenoAltura(x,z){
   var alturaEscalera=geo.alturaEscaleraLateral(x,z);
   if(alturaEscalera!==null) return alturaEscalera;
 
+  var alturaCaja=geo.alturaCajaEscalera(x,z);
+  if(alturaCaja!==null) return alturaCaja;
+
   var alturaRampa=geo.alturaRampaTrasera(x,z);
   if(alturaRampa!==null) return alturaRampa;
 
