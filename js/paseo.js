@@ -22,6 +22,7 @@ var camara=null, elemento=null;
 var yaw=0, pitch=0;
 var teclas={};
 var x=0, z=0;               // posición horizontal del jugador
+var nivelActual=0;           // 0=platea, 1=principal (suelo a 4,35 m)
 var alturaSalto=0, velocidadSalto=0;
 var sentado=null;
 var alSalirCb=null;
@@ -33,11 +34,22 @@ function terrenoAltura(x,z){
   var esc=geo.escenario;
   if(Math.abs(x) < esc.mitadX && z <= esc.zFrente && z >= esc.zFondo) return esc.altura;
 
+  // La caja es la única zona que cambia de planta. Mientras se recorren
+  // sus peldaños conserva la altura exacta; al cruzar su mitad recuerda
+  // qué corredor debe resolver cuando se abandone el último escalón.
+  var alturaCaja=geo.alturaCajaEscalera(x,z);
+  if(alturaCaja!==null){
+    nivelActual=alturaCaja>(geo.cajaEscalera.baseY+geo.cajaEscalera.primerPisoY)/2?1:0;
+    return alturaCaja;
+  }
+
+  if(nivelActual===1){
+    if(geo.enNivelPalcos(1,x,z))return geo.P.pisos[1].y;
+    return null;
+  }
+
   var alturaEscalera=geo.alturaEscaleraLateral(x,z);
   if(alturaEscalera!==null) return alturaEscalera;
-
-  var alturaCaja=geo.alturaCajaEscalera(x,z);
-  if(alturaCaja!==null) return alturaCaja;
 
   var alturaRampa=geo.alturaRampaTrasera(x,z);
   if(alturaRampa!==null) return alturaRampa;
@@ -59,8 +71,9 @@ function terrenoAltura(x,z){
 /* Las butacas bloquean solo su volumen real, no el bloque rectangular
    completo; de este modo se puede avanzar por los huecos entre ellas. */
 function posicionValida(px,pz){
-  if(terrenoAltura(px,pz)===null) return false;
-  if(FALLA.puertas && FALLA.puertas.bloquea(px,pz)) return false;
+  var suelo=terrenoAltura(px,pz);
+  if(suelo===null) return false;
+  if(FALLA.puertas && FALLA.puertas.bloquea(px,pz,suelo)) return false;
   if(alturaSalto<=0.02 && !geo.enPlatea(px,pz) && geo.enButacaIndividual(px,pz)) return false;
   return true;
 }
@@ -108,8 +121,9 @@ function interactuar(){
     alturaSalto=0;velocidadSalto=0;
     return;
   }
-  if(FALLA.puertas && FALLA.puertas.cercana(x,z,1.75)){
-    FALLA.puertas.alternarCercana(x,z);return;
+  var sueloActual=terrenoAltura(x,z);
+  if(FALLA.puertas && FALLA.puertas.cercana(x,z,1.75,sueloActual)){
+    FALLA.puertas.alternarCercana(x,z,sueloActual);return;
   }
   var s=butacaCercana(0.78);
   if(s){
@@ -156,6 +170,7 @@ function entrar(camaraRef, el, cb){
     elemento._paseoRecaptura=true;
   }
   x=camara.position.x; z=camara.position.z;
+  nivelActual=(geo.enNivelPalcos(1,x,z) && camara.position.y>geo.P.pisos[1].y)?1:0;
 
   camara.getWorldDirection(vDir);
   yaw = Math.atan2(-vDir.x, -vDir.z);
@@ -215,7 +230,7 @@ function actualizar(dt){
 
   var aviso=document.getElementById('interaccion');
   if(aviso){
-    var juntoPuerta=!sentado && FALLA.puertas && FALLA.puertas.cercana(x,z,1.75);
+    var juntoPuerta=!sentado && FALLA.puertas && FALLA.puertas.cercana(x,z,1.75,suelo);
     var juntoButaca=!sentado && butacaCercana(0.78);
     aviso.hidden=!(sentado||juntoPuerta||juntoButaca);
     if(sentado) aviso.textContent='Pulsa E para levantarte';

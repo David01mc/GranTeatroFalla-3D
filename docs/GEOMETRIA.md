@@ -56,7 +56,7 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | `mamparasEscaleras` | Mamparas mudéjares de tres arcos junto al palco 2. |
 | `texturaSalida` | Cartel generado para “SALIDA / EXIT”. |
 | `salidasEscalerasPasillo` | Rellanos que comunican las escaleras con el corredor posterior. |
-| `cajaEscaleraPrimerPiso` | Caja de escalera de un ala (`signo` = ±1). Cuelga del flanco sur del pasillo EXIT y ocupa su mismo tramo de x, así que se abre de frente nada más salir: tres vuelos alfombrados con sus rellanos, barandilla del hueco y pretil del desembarco, hasta la cota del primer piso. El vuelo que desembarca queda pegado al muro del teatro, que es por donde tendrá que abrirse el paso al piso principal. |
+| `cajaEscaleraPrimerPiso` | Caja de escalera de un ala (`signo` = ±1). Tres vuelos alfombrados conducen desde platea hasta 4,35 m. El antiguo pretil superior se ha retirado y el último peldaño desemboca directamente en el corredor principal. |
 
 ## Palcos de platea
 
@@ -72,9 +72,12 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | `construirSillaPalco`, `sillasPalco` | Sillas simplificadas y distribución dentro de cada palco. |
 | `geometriaCortinaPalco` | Hoja recogida de terciopelo de una portada. |
 | `columnaMudejar` | Columna completa compartida entre arcos. |
-| `portadasPalcosPlatea` | Arcos, paños superiores, dientes, adornos, columnas y cortinas. |
+| `portadasPalcosPlatea` | Arcos, paños superiores, dientes, adornos, columnas y cortinas; admite una cota de techo para reutilizar la misma portada en platea y principal. |
+| `apliqueEntresuelo` | Aplique volumétrico de bronce envejecido con dos brazos, globos opalinos y lágrimas colgantes. |
+| `apliquesEntresuelo` | Distribuye un aplique bajo el centro de cada palco lateral del piso principal. |
 | `antepalcosPlatea` | Extensión posterior de 2 m, tabiques y puertas de cada palco. |
 | `pasilloCurvoPalcos` | Corredor curvo común situado detrás de los antepalcos. |
+| `enNivelPalcos` | Contorno transitable de los pisos elevados; permite conservar la cota principal al abandonar la escalera. |
 
 ## Puertas e interacción
 
@@ -92,6 +95,8 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | --- | --- |
 | `palcoAutoridades` | Sala central del piso principal y sus aproximadamente 40 asientos. |
 | `fondoTecnicoPlatea` | Rampas posteriores, plataforma de las tres cabinas y fachada curva de cinco arcos. |
+| `entresueloDecorativoPrincipal` | Grupo de 25 cm entre la cota inferior histórica (4,10 m) y el suelo principal (4,35 m). El frente visible desde el patio lleva un paño malva entre molduras horizontales, sin la cenefa superior de arquillos; intradós, trasdós y testeros permanecen separados. |
+| Corredor principal | Réplica transitable a 4,35 m con huecos de losa para ambas escaleras, pavimento, paredes, antepalcos, valla ornamental, portadas arqueadas y puertas independientes por altura. La antigua tapa oscura, el antepecho macizo y el muro burdeos original quedan abiertos entre 4,35 y 6,70 m; sobre la pared clara se conserva únicamente un velo translúcido de sombra. |
 | `texturaTecho` | Carga la pintura del techo. |
 | `lampara` | Araña central simplificada. |
 

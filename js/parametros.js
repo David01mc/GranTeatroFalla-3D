@@ -19,9 +19,10 @@ var P = {
   zRake: 2.0,
   altura: 13.4,      // hasta el techo de Abárzuza
   anchoPasilloPalcos: 3.90, // corredor posterior (antes 3.00 m; +30 %)
+  entresueloPrincipal: 0.25, // espesor decorativo entre 4.10 y 4.35 m
   pisos: [           // y del piso, y del antepecho, retranqueo, nº de palcos
     {y:0.00, alto:1.15, dentro:2.90, palcos:0, palcosLado:9, nombre:'platea'},
-    {y:4.10, alto:1.15, dentro:2.10, palcos:22, palcosLado:11, nombre:'principal'},
+    {y:4.35, alto:1.15, dentro:2.10, palcos:22, palcosLado:11, nombre:'principal'},
     {y:6.70, alto:1.10, dentro:2.70, palcos:20, nombre:'segundo'},
     {y:9.60, alto:1.05, dentro:3.30, palcos:0,  nombre:'paraíso'}
   ],
@@ -150,6 +151,7 @@ var BORDE_PLATEA=dentro(PLAN,P.pisos[0].dentro);
 var EXTERIOR_ANTEPALCO=dentro(PLAN,-2.0);
 // El antepalco termina a -2 m; desde ahí se mide el corredor posterior.
 var EXTERIOR_PASILLO=dentro(PLAN,-(2.0+P.anchoPasilloPalcos));
+var BORDES_NIVELES=P.pisos.map(function(piso){return dentro(PLAN,piso.dentro);});
 
 /* Caja de escalera de acceso al primer piso, anexa a cada extremo del
    corredor posterior. La planta reproduce el boceto: la caja cuelga al
@@ -223,13 +225,6 @@ function alturaEnTramoCaja(t,x,z){
     Math.max(0,Math.floor(u*CAJA_ESCALERA.peldanos)));
   return t.y0+(t.y1-t.y0)*(escalon+1)/CAJA_ESCALERA.peldanos;
 }
-/* ¿Cae el punto en el pretil del desembarco? Es el único obstáculo de
-   la caja que sobresale al pasillo, y hay que descontarlo también de
-   enSalidaPasillo o el pasillo lo volvería pisable. */
-function enPretilCajaEscalera(x,z){
-  var p=CAJA_ESCALERA.pretil, ax=Math.abs(x);
-  return ax>=p.xMin && ax<=p.xMax && z>p.z && z<p.z+p.grosor;
-}
 /* Cota pisable de la caja de escalera. Trabaja sobre |x|: las dos alas
    son la misma sala reflejada. El hueco central queda a la cota de
    partida; el último vuelo desemboca asomado al pasillo a +2.88 m, un
@@ -260,11 +255,19 @@ function dentroDeContornoAbierto(pts,x,z){
 function enPlatea(x,z){
   return z>=3.2 && dentroDeContornoAbierto(EXTERIOR_PASILLO,x,z) && !dentroDeContornoAbierto(BORDE_PLATEA,x,z);
 }
+/* Anillo transitable de un piso alto: balconada, antepalcos y corredor
+   comparten cota. El índice coincide con P.pisos (1 = principal). */
+function enNivelPalcos(nivel,x,z){
+  var piso=P.pisos[nivel];
+  if(!piso || nivel<1)return false;
+  var borde=BORDES_NIVELES[nivel];
+  return dentroDeContornoAbierto(EXTERIOR_PASILLO,x,z) &&
+         !dentroDeContornoAbierto(borde,x,z);
+}
 /* Rellanos rectos que enlazan las escaleras próximas al escenario con
    los dos extremos abiertos del corredor posterior. */
 function enSalidaPasillo(x,z){
   var ax=Math.abs(x);
-  if(enPretilCajaEscalera(x,z)) return false;
   return ax>=ESCALERAS_LATERALES.xAlto-0.05 && ax<=CAJA_ESCALERA.xMax &&
          z>=ESCALERAS_LATERALES.centroZ-ESCALERAS_LATERALES.ancho/2 &&
          z<=ESCALERAS_LATERALES.centroZ+ESCALERAS_LATERALES.ancho/2+0.08;
@@ -288,6 +291,7 @@ FALLA.geo = {
   dentroDePlanta: dentroDePlanta,
   distAPlanta: distAPlanta,
   enPlatea: enPlatea,
+  enNivelPalcos:enNivelPalcos,
   enSalidaPasillo: enSalidaPasillo,
   cajaEscalera:CAJA_ESCALERA,
   alturaCajaEscalera:alturaCajaEscalera,
