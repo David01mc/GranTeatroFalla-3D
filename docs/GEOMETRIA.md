@@ -23,11 +23,12 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | Función | Objeto o responsabilidad |
 | --- | --- |
 | `limitesFrontal` | Límites seguros de los dos palcos frontales junto al escenario. |
-| `palcosFrontales` | Pareja de palcos enfrentados junto a la boca escénica, en x 9,00–11,50 y z −1,00…1,80. Recibe la cota de sus cerramientos (`yBase`): en platea es el patio en pendiente, así que se apoya en el suelo; en un piso alto es el intradós de su propia losa y entonces vuela como el resto de la balconada. Se apila en platea (1,15) y principal (4,35). |
+| `palcosFrontales` | Pareja de palcos enfrentados junto a la boca escénica, en x 9,00–11,50 y z −1,00…1,80. Su frente se abomba 42 cm hacia la sala y queda coronado por `arcoPalcoFrontal`: jambas largas, paño superior mudéjar y arco casi plano con 15 dientes en el intradós. Recibe la cota de sus cerramientos (`yBase`): en platea es el patio en pendiente, así que se apoya en el suelo; en un piso alto es el intradós de su propia losa y entonces vuela como el resto de la balconada. El tabique de platea tiene 8 cm, alcanza el palco principal y combina `PanelPalcoFrontalMudejar.webp` abajo con `FrisoSuperiorPalcoFrontalMudejar.webp` arriba. Se apila en platea (1,15) y principal (4,35). Su techo se rehúnde 5 mm bajo el forjado que lo cubre: con los palcos de proscenio adelantados, el suelo del anillo pasa por encima a la cota exacta del piso y las dos tapas se disputarían el plano. |
 | `zFila` | Posición longitudinal de una fila del patio. |
 | `sitiosCentro` | Coordenadas de las butacas del bloque central. |
 | `sitiosLateral` | Coordenadas de las butacas laterales, respetando el pasillo junto al muro. |
 | `enBloqueAsientos` | Zona lógica ocupada por las filas; la consulta el modo paseo. |
+| `enButacaIndividual` | Colisión del patio, por franjas y no butaca a butaca. Dentro del bloque todo está ocupado salvo el espacio de piernas de cada fila (`PIERNAS_DELANTE`/`PIERNAS_DETRAS`), continuo a lo ancho para llegar al sitio pero separado del de la fila siguiente por el cuerpo de las butacas: no se cambia de fila sin salir al pasillo o saltar. Acotar cada asiento por separado dejaba 12 cm libres entre butacas que, repetidos fila tras fila, formaban pasillos rectos de delante a atrás. |
 | `ejeAlfombraPasillo` | Fuente única del eje recto/curvo de cada alfombra longitudinal y rampa posterior. |
 | `anchoAlfombraPasillo` | Anchura compartida de la alfombra en cada punto. |
 | `bordeAlfombraPasillo` | Vértices exactos de los bordes interior y exterior de la alfombra. Los usan también los suelos contiguos. |
@@ -46,8 +47,8 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | `juegoTelon` | Bambalinas y patas laterales. |
 | `construirTelonFuncional` | Telón principal animado. |
 | `suaveT`, `actualizarTelon`, `alternarTelon` | Estado y animación de apertura/cierre del telón. |
-| `escenario` | Tarima, telones y elementos interiores del escenario. |
-| `sueloFoso` | Suelo del espacio reservado delante del escenario. |
+| `escenario` | Tarima con borde delantero curvo, faldón de madera, telones y elementos interiores. Alcanza las pilastras, cuyos basamentos nacen sobre las tablas. |
+| `sueloFoso` | Foso transitable a −0,90 m con suelo de madera negra, valla curva junto a la alfombra transversal y dos escaleras laterales de 6 peldaños con rellanos y pasamanos. |
 
 ## Accesos laterales
 
@@ -80,7 +81,21 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | `pasilloCurvoPalcos` | Corredor curvo común situado detrás de los antepalcos. |
 | `enNivelPalcos` | Contorno transitable de los pisos elevados; permite conservar la cota principal al abandonar la escalera. |
 
-En el principal, el anillo arranca en `iFrontalD` (primer punto de planta pasada la boca del palco frontal) en vez del índice 0, para dejarle sitio: se recortan contra él antepecho, canto del entresuelo, separadores, sillas, portadas, apliques y antepalcos. El **suelo y el intradós siguen dando la vuelta completa** — recortarlos dejaba cuñas sin suelo entre el palco y el arranque del anillo, y `enNivelPalcos` decide por contorno, no por la geometría existente. El palco se separa 5 mm de ambas superficies para que no peleen por el mismo plano. El corredor trasero tampoco se recorta: va por x≥14,5 y nunca roza el palco.
+En el principal, el anillo arranca en `iFrontalD` (primer punto de planta pasada la boca del palco frontal) en vez del índice 0, para dejarle sitio al palco frontal: se recortan contra él antepecho, canto del entresuelo, separadores, sillas, portadas, apliques y antepalcos. El **suelo y el intradós siguen dando la vuelta completa** — recortarlos dejaba cuñas sin suelo entre el palco y el arranque del anillo. El palco se separa 5 mm de ambas superficies para que no peleen por el mismo plano. El corredor trasero tampoco se recorta: va por x≥14,5 y nunca roza el palco.
+
+`adelantaPalcosProscenio()` corrige la planta antes de dibujar nada. Sin él, el anillo arrancaba ya sobre la herradura, en x = 11,14, mientras el frente del palco frontal está en x = 9,00: la valla daba un escalón de 2,14 m justo en la junta entre los dos, con el palco frontal asomado sobre el patio y el palco 2 retranqueado contra el muro.
+
+La función trae el borde interior del principal hasta esa misma línea (`limitesFrontal().xFrente + DESPLAZAMIENTO_FRONTAL_X` = 9,00). Se adelanta **sólo el palco 2**: su frente pasa a ser el del palco frontal y su fondo se queda en el muro, así que gana profundidad hasta 4,15 m. Desde su tabique el borde vuelve a la herradura con un suavizado de pendiente nula al llegar, repartido sobre `PALCOS_VUELTA_PROSCENIO` palcos (hoy 1, el palco 3) y medido sobre el recorrido real de la valla, no por índice. Con 0 el regreso es un ángulo seco y se nota mucho en la celosía vista desde el patio; con 1 el palco 3 hace de embudo y la valla entra en la curva sin quiebro. El corte se toma del mismo reparto por longitud que usa `separadoresPalco()`, no de una distancia aparte, así que el palco 2 llega adelantado exactamente hasta su tabique y no hasta media celda.
+
+Medido sobre la escena en el ala derecha, la valla sale del palco frontal (x 8,58–9,00, con su bombeo de 42 cm), sigue recta en x = 8,98 de z = 2,0 a z = 4,4 —el palco 2— y vuelve a la herradura entre z = 4,8 y z = 7,2: 9,31 · 9,61 · 10,12 · 10,68 · 11,24 · 11,48 · 11,58, donde ya coincide con el trazado original. El mayor desvío entre muestras a 40 cm baja de 1,21 m con el regreso seco a 0,56 m con el actual.
+
+`iFrontalD` se elige sobre la planta, pero el borde interior lo produce `dentro()`, que desplaza cada punto por su normal — y junto a la embocadura esa normal tiene mucha componente en z. Resultado: el primer punto del anillo cae en z = 2,67 mientras el palco frontal termina en z = 1,80. Valla y canto arrancaban ahí y dejaban una **cuña de 87 cm de suelo sin cerrar**, por la que se veía la pared del fondo. `bordeAnillo` recibe un punto de arranque adicional en `Z_CORREDOR_INI`, a la misma x (ese tramo ya es recto), para que empalme con el palco frontal. El suelo no lo necesitaba: `banda()` lo cose desde el contorno completo, que sí pasa por ahí.
+
+El contorno deformado no es el que `dentro(PLAN, piso.dentro)` produce, así que `construir()` se lo pasa a `geo.fijaBordeNivel(1, borde)`: `enNivelPalcos` decide por contorno, no por la geometría dibujada, y sin eso el modo paseo bloquearía un suelo que existe. Comprobado con 525 muestras entre z = 2,2 y z = 12: ningún punto transitable sin suelo debajo.
+
+**Cierre de la caja escénica y remate del muro frontal.** Tarima, fondo y telones no formaban volumen: por encima de la bambalina más alta y por los dos costados se veía el exterior desde el patio. `escenario()` añade dos paños laterales en x = ±9,50 y un techo a y = 12, con el mismo negro (`MAT.hueco`) y la misma medida que el fondo, de la boca (z = 0) al telón de fondo (z = −18,40): a la vista sigue siendo oscuridad, pero ya no hay por dónde escaparse, y queda fuera de la luz del arco (`P.arcoA` = 7,50), así que desde la sala no asoma. `embocadura()` prolonga además el muro frontal 2 m por encima de `P.altura`, retranqueado 40 cm hacia el escenario para que las alas lo tapen: alas y paño del arco terminaban justo en 13,40 y ahí el techo de la sala ya ha despegado, dejando una ranura horizontal.
+
+El segundo piso no crea otro palco frontal. `uneContornoAPared` recorta por separado su borde interior y exterior en `z = 1,80 m`. La barandilla nace en la arista interior de la mampara (`x = 9,00 m`) y el suelo alcanza su arista exterior (`x = 11,50 m`). No hay geometría transversal sobre el panel: ambos contornos salen hacia el fondo y recuperan gradualmente su curva original durante los 4,60 m siguientes. Suelo, intradós, barandilla, moldura y separadores comparten este trazado.
 
 ## Puertas e interacción
 
@@ -139,7 +154,7 @@ Es la zona más entrelazada del archivo: valla, suelo, canto y mamparas comparte
 | `CENTRO_MEDIO`, `LATERAL_DENTRO` | Semianchura del bloque central y borde interior de los laterales. Derivadas, no se editan sueltas. |
 | `SITIOS_BUTACAS` | Lista ya calculada de todas las posiciones de butaca (centro más los dos laterales). Se resuelve una sola vez al cargar y la reutilizan tanto el instanciado de `butacas` como la colisión del modo paseo. |
 | `RESERVA_TECNICA_MEDIA` | Semianchura reservada al fondo para los cinco vanos técnicos. Debe superar el borde exterior del último arco, o la última portada de palco lo invade. |
-| `ANCHO_FRONTAL`, `DESPLAZAMIENTO_FRONTAL_X` | Fondo del palco frontal y su retranqueo hacia el muro lateral. |
+| `ANCHO_FRONTAL`, `DESPLAZAMIENTO_FRONTAL_X` | Fondo del palco frontal y su retranqueo hacia el muro lateral. Su suma con `limitesFrontal().xFrente` da x = 9,00, la línea a la que `adelantaPalcosProscenio()` trae el palco 2 del principal. |
 | `RETIRO_ESCENARIO_Z` | Retiro de 2,5 m, derivado de `geo.frenteEscenico`: aloja la diagonal sin recortar los palcos. |
 | `AVANCE_ALAS_EMBOCADURA` | Avance de las alas diagonales (1,5 m) hasta el comienzo fijo de los palcos frontales en z = −1 m. |
 | `Z_CORREDOR_INI`, `Z_CORREDOR_FIN` | Límites del pasillo transversal; marcan también dónde arranca el ala de platea. |
@@ -154,3 +169,7 @@ Es la zona más entrelazada del archivo: valla, suelo, canto y mamparas comparte
 No se deben recalcular localmente los bordes de las alfombras posteriores. Hay que usar `ejeAlfombraPasillo`, `anchoAlfombraPasillo` o `bordeAlfombraPasillo`. Esto mantiene alineados alfombra, rampas, plataforma técnica y terminaciones de los palcos.
 
 La floritura de `geometriaBalaustreOrnamental` combina rombos superiores, volutas, óvalo central y hojas inferiores con filetes en relieve por ambas caras. Los calados no se solapan. La geometría se comparte por altura y se monta mediante instancias.
+
+`geo.frenteEscenario(x)` define el borde de la tarima: extremos en z = −1 m y avance central de 0,65 m. `geo.frenteFoso(x)` sitúa el centro de la valla en z = 1,65 m, a 15 cm del borde de la alfombra transversal. Geometría y modo paseo usan estas mismas funciones; el retiro de la caja escénica y los telones sigue siendo 2,5 m. Estas cotas son aproximaciones visuales a las referencias, no medidas del teatro.
+
+El fondo del foso está a y = −0,90 m. `geo.contornoPatioConFoso()` recorta la cavidad en el parquet; `geo.alturaAccesoFoso()` y `geo.bloqueaBarandillaFoso()` mantienen el paseo alineado con ambos accesos. Los vuelos discurren hacia el centro entre |x| = 7,80 y 6,12 m, con huellas de 28 cm y contrahuellas de 15 cm. Los rellanos laterales enlazan con el paso del patio. El faldón curvo del escenario usa `MaderaPlateaInferior.webp`.

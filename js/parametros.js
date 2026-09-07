@@ -153,6 +153,14 @@ var EXTERIOR_ANTEPALCO=dentro(PLAN,-2.0);
 var EXTERIOR_PASILLO=dentro(PLAN,-(2.0+P.anchoPasilloPalcos));
 var BORDES_NIVELES=P.pisos.map(function(piso){return dentro(PLAN,piso.dentro);});
 
+/* El contorno interior de un piso no siempre es el simple retranqueo de
+   la planta: en el principal los palcos de proscenio se adelantan hasta
+   la línea del palco frontal (adelantaPalcosProscenio en geometria.js).
+   Quien construye la geometría deja aquí el contorno que ha dibujado de
+   verdad, para que enNivelPalcos —y con él el modo paseo— no bloquee un
+   suelo que existe ni deje pisar uno que no. */
+function fijaBordeNivel(nivel,contorno){ BORDES_NIVELES[nivel]=contorno; }
+
 /* Caja de escalera de acceso al primer piso, anexa a cada extremo del
    corredor posterior. La planta reproduce el boceto: la caja cuelga al
    sur del pasillo EXIT y ocupa su mismo tramo de x, de modo que se abre
@@ -287,6 +295,48 @@ function distAPlanta(x,z){
 // el escenario, cuyo retiro se deduce de ese encuentro fijo.
 var FRENTE_ESCENICO={zInicioPalcos:-1.0,avanceAlas:1.5};
 FRENTE_ESCENICO.retiro=FRENTE_ESCENICO.avanceAlas-FRENTE_ESCENICO.zInicioPalcos;
+var ESCENARIO={altura:1.05,mitadX:9,zFondo:-16-FRENTE_ESCENICO.retiro,
+  zFrente:FRENTE_ESCENICO.zInicioPalcos,curvatura:0.65};
+var FOSO={altura:-0.90,zVallaCentro:1.65,altoValla:0.85,grosorValla:0.10,
+  escaleras:{xBajo:6.12,xAlto:7.80,xExterior:9,zCentro:0.25,ancho:1.0,zEntrada:1.80,peldanos:6}};
+function frenteEscenario(x){
+  var t=Math.min(1,Math.abs(x)/ESCENARIO.mitadX);
+  return ESCENARIO.zFrente+ESCENARIO.curvatura*(1-t*t);
+}
+function frenteFoso(x){
+  return FOSO.zVallaCentro+frenteEscenario(x)-frenteEscenario(0);
+}
+function alturaAccesoFoso(x,z){
+  var e=FOSO.escaleras,ax=Math.abs(x),zMin=e.zCentro-e.ancho/2,zMax=e.zCentro+e.ancho/2;
+  if(ax>=e.xAlto && ax<=e.xExterior && z>=zMin && z<=e.zEntrada)return 0;
+  if(ax<e.xBajo || ax>=e.xAlto || z<zMin || z>zMax)return null;
+  var peldaño=Math.min(e.peldanos-1,Math.floor((ax-e.xBajo)/(e.xAlto-e.xBajo)*e.peldanos));
+  return FOSO.altura*(1-(peldaño+1)/e.peldanos);
+}
+function bloqueaBarandillaFoso(x,z){
+  var e=FOSO.escaleras,ax=Math.abs(x),margen=0.12;
+  if(ax<=e.xAlto && Math.abs(z-frenteFoso(x))<FOSO.grosorValla/2+0.16)return true;
+  // Los pasamanos impiden salir de lado de los vuelos y del rellano.
+  if(ax>=e.xBajo && ax<=e.xAlto && Math.abs(Math.abs(z-e.zCentro)-e.ancho/2)<margen)return true;
+  return Math.abs(ax-e.xAlto)<margen && z>=e.zCentro+e.ancho/2 && z<=frenteFoso(e.xAlto);
+}
+function contornoPatioConFoso(){
+  // La cavidad corta el frente abierto de la sala: se incorpora como
+  // entrante del contorno, evitando un agujero que toque su borde.
+  var pts=PLAN.slice();
+  pts.push({x:-ESCENARIO.mitadX,z:0});
+  contornoFrenteEscenario().forEach(function(p){pts.push({x:p.x,z:frenteFoso(p.x)});});
+  pts.push({x:ESCENARIO.mitadX,z:0});
+  return pts;
+}
+function contornoFrenteEscenario(){
+  var pts=[];
+  for(var i=0;i<=64;i++){
+    var x=ESCENARIO.mitadX*(2*i/64-1);
+    pts.push({x:x,z:frenteEscenario(x)});
+  }
+  return pts;
+}
 
 FALLA.geo = {
   P: P,
@@ -297,6 +347,7 @@ FALLA.geo = {
   distAPlanta: distAPlanta,
   enPlatea: enPlatea,
   enNivelPalcos:enNivelPalcos,
+  fijaBordeNivel:fijaBordeNivel,
   enSalidaPasillo: enSalidaPasillo,
   cajaEscalera:CAJA_ESCALERA,
   alturaCajaEscalera:alturaCajaEscalera,
@@ -309,6 +360,13 @@ FALLA.geo = {
   alturaRampaTrasera:alturaRampaTrasera,
   // caja del suelo del escenario (ver geometria.js: escenario()) — la usa el modo paseo para pisar las tablas
   frenteEscenico:FRENTE_ESCENICO,
-  escenario: {altura:1.05, mitadX:9, zFondo:-16-FRENTE_ESCENICO.retiro, zFrente:-FRENTE_ESCENICO.retiro}
+  escenario:ESCENARIO,
+  foso:FOSO,
+  frenteEscenario:frenteEscenario,
+  frenteFoso:frenteFoso,
+  alturaAccesoFoso:alturaAccesoFoso,
+  bloqueaBarandillaFoso:bloqueaBarandillaFoso,
+  contornoPatioConFoso:contornoPatioConFoso,
+  contornoFrenteEscenario:contornoFrenteEscenario
 };
 })();

@@ -38,6 +38,8 @@ var texParedPasillo = textura('Textures/ParedPasilloBlanca.webp', 1, 1.5);
 var texMaderaPasillo= textura('Textures/MaderaPasilloGrisOscura.webp', 1, 1);
 var texBaldosaPasillo=textura('Textures/BaldosasPasilloClaras.webp', 1, 1);
 var texTerciopeloPasamanos=textura('Textures/TerciopeloPasamanos.webp', 1, 1);
+var texPanelPalcoFrontal=cargador.load('Textures/PanelPalcoFrontalMudejar.webp');
+var texFrisoPalcoFrontal=cargador.load('Textures/FrisoSuperiorPalcoFrontalMudejar.webp');
 // Acabado del canto visible del entresuelo: paño malva entre molduras
 // horizontales, sin la cenefa de arquillos de la parte superior.
 var texEntresuelo   = textura('Textures/EntresueloOrnamental.webp', 0.33, 1);
@@ -54,6 +56,9 @@ var MAT = {
   // numerosos focos cálidos de los palcos.
   maderaBlanca:     new THREE.MeshLambertMaterial({map:texMaderaBlanca, color:0xb0a99b, side:THREE.DoubleSide}),
   maderaPlatea:     new THREE.MeshLambertMaterial({map:texMaderaPlatea, side:THREE.DoubleSide}),
+  maderaFoso:       new THREE.MeshLambertMaterial({map:texMaderaPasillo, color:0x292929, side:THREE.DoubleSide}),
+  panelPalcoFrontal:new THREE.MeshLambertMaterial({map:texPanelPalcoFrontal, color:0xc8b99b, side:THREE.DoubleSide}),
+  frisoPalcoFrontal:new THREE.MeshLambertMaterial({map:texFrisoPalcoFrontal, color:0xc8b99b, side:THREE.DoubleSide}),
   terciopelo2:      new THREE.MeshLambertMaterial({map:texTerciopelo2, side:THREE.DoubleSide}),
   terciopeloPasamanos:new THREE.MeshLambertMaterial({map:texTerciopeloPasamanos,
                         color:0x9a7777, side:THREE.DoubleSide}),

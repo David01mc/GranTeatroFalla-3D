@@ -41,9 +41,13 @@ function terrenoAltura(x,z){
     if(Math.abs(z-zMuro)<margen) return null;
   }
   var esc=geo.escenario;
-  if(Math.abs(x) < esc.mitadX && z <= esc.zFrente && z >= esc.zFondo) return esc.altura;
-  // Suelo del foso ampliado hasta el nuevo frente de la tarima.
-  if(Math.abs(x) < esc.mitadX && z > esc.zFrente && z <= 0) return 0.08;
+  if(ax <= esc.mitadX){
+    if(geo.bloqueaBarandillaFoso(x,z))return null;
+    var accesoFoso=geo.alturaAccesoFoso(x,z);
+    if(accesoFoso!==null)return accesoFoso;
+    if(z <= geo.frenteEscenario(x) && z >= esc.zFondo)return esc.altura;
+    if(z > geo.frenteEscenario(x) && z < geo.frenteFoso(x))return geo.foso.altura;
+  }
 
   // La caja es la única zona que cambia de planta. Mientras se recorren
   // sus peldaños conserva la altura exacta; al cruzar su mitad recuerda
