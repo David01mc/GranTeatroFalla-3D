@@ -283,6 +283,11 @@ function distAPlanta(x,z){
   return m;
 }
 
+// Los palcos conservan su huella original. La diagonal se aloja hacia
+// el escenario, cuyo retiro se deduce de ese encuentro fijo.
+var FRENTE_ESCENICO={zInicioPalcos:-1.0,avanceAlas:1.5};
+FRENTE_ESCENICO.retiro=FRENTE_ESCENICO.avanceAlas-FRENTE_ESCENICO.zInicioPalcos;
+
 FALLA.geo = {
   P: P,
   rake: rake,
@@ -303,6 +308,7 @@ FALLA.geo = {
   anchoRampaTrasera:anchoRampaTrasera,
   alturaRampaTrasera:alturaRampaTrasera,
   // caja del suelo del escenario (ver geometria.js: escenario()) — la usa el modo paseo para pisar las tablas
-  escenario: {altura:1.05, mitadX:9, zFondo:-17, zFrente:-0.7}
+  frenteEscenico:FRENTE_ESCENICO,
+  escenario: {altura:1.05, mitadX:9, zFondo:-16-FRENTE_ESCENICO.retiro, zFrente:-FRENTE_ESCENICO.retiro}
 };
 })();

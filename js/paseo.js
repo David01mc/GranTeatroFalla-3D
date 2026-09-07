@@ -31,8 +31,19 @@ var vDir=new THREE.Vector3();
 /* Altura del suelo transitable en (x,z), o null si es zona no navegable
    (fuera de la planta, o parte maciza del muro de la embocadura). */
 function terrenoAltura(x,z){
+  // Comprueba las alas antes que la tarima: parte del muro oblicuo
+  // coincide en planta con el borde del escenario.
+  var boca=geo.embocadura,ax=Math.abs(x);
+  if(boca && ax>geo.P.arcoA && ax<geo.P.jamba+1.0){
+    var pendiente=boca.avance/(boca.xEncuentro-geo.P.arcoA);
+    var zMuro=-boca.retiro+Math.min(ax-geo.P.arcoA,boca.xEncuentro-geo.P.arcoA)*pendiente;
+    var margen=0.35*(ax<boca.xEncuentro?Math.hypot(1,pendiente):1);
+    if(Math.abs(z-zMuro)<margen) return null;
+  }
   var esc=geo.escenario;
   if(Math.abs(x) < esc.mitadX && z <= esc.zFrente && z >= esc.zFondo) return esc.altura;
+  // Suelo del foso ampliado hasta el nuevo frente de la tarima.
+  if(Math.abs(x) < esc.mitadX && z > esc.zFrente && z <= 0) return 0.08;
 
   // La caja es la única zona que cambia de planta. Mientras se recorren
   // sus peldaños conserva la altura exacta; al cruzar su mitad recuerda
@@ -55,9 +66,6 @@ function terrenoAltura(x,z){
   if(alturaRampa!==null) return alturaRampa;
 
   if(geo.enSalidaPasillo(x,z)) return geo.platea.altura;
-
-  // El muro de la embocadura solo tiene paso entre sus dos jambas.
-  if(z > -0.6 && z < 0.35 && Math.abs(x) > geo.P.arcoA) return null;
 
   // Suelo horizontal elevado de la platea. Por ahora solo colisiona la
   // plataforma: sus sillas y demás mobiliario se mantienen atravesables.

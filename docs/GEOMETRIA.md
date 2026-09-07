@@ -23,6 +23,7 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | Función | Objeto o responsabilidad |
 | --- | --- |
 | `limitesFrontal` | Límites seguros de los dos palcos frontales junto al escenario. |
+| `palcosFrontales` | Pareja de palcos enfrentados junto a la boca escénica, en x 9,00–11,50 y z −1,00…1,80. Recibe la cota de sus cerramientos (`yBase`): en platea es el patio en pendiente, así que se apoya en el suelo; en un piso alto es el intradós de su propia losa y entonces vuela como el resto de la balconada. Se apila en platea (1,15) y principal (4,35). |
 | `zFila` | Posición longitudinal de una fila del patio. |
 | `sitiosCentro` | Coordenadas de las butacas del bloque central. |
 | `sitiosLateral` | Coordenadas de las butacas laterales, respetando el pasillo junto al muro. |
@@ -40,7 +41,7 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | --- | --- |
 | `perfilArco` | Perfil 2D del arco rebajado de la embocadura. |
 | `cintaArcoRebajado` | Molduras concéntricas de la embocadura. |
-| `embocadura` | Jambas, arco superior, paños decorados y molduras de la boca escénica. |
+| `embocadura` | Dintel frontal y alas diagonales hacia los palcos; las pilastras completas giran con las alas. Publica su sección para las colisiones del paseo. |
 | `perfilCortina`, `perfilMedioTelon`, `cortina` | Geometría ondulada de cortinas y telón. |
 | `juegoTelon` | Bambalinas y patas laterales. |
 | `construirTelonFuncional` | Telón principal animado. |
@@ -66,7 +67,7 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | `posteYesoEnIndice` | Separador bajo ondulado entre dos palcos. |
 | `separadoresPalco` | Distribuye los separadores de un grupo de palcos. |
 | `geometriaBalaustreOrnamental` | Módulo continuo y fino de celosía con octógonos entrelazados, volutas, medallón oval y siete calados; usa una extrusión de 38 mm y bisel ligero para reducir masa y polígonos. |
-| `barandillaPalco` | Zócalo, balaustres y pasamanos de una barandilla. |
+| `barandillaPalco` | Zócalo, celosía con floritura por ambas caras y pasamanos. La anchura de cada módulo se ajusta al tramo para cerrar las juntas. |
 | `tramosPlateaSinSalidas` | Corta una curva en los accesos 1 y 5. |
 | `barandillaPlateaConSalidas` | Barandilla de platea dejando libres ambos accesos. |
 | `construirSillaPalco`, `sillasPalco` | Sillas simplificadas y distribución dentro de cada palco. |
@@ -78,6 +79,8 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | `antepalcosPlatea` | Extensión posterior de 2 m, tabiques y puertas de cada palco. |
 | `pasilloCurvoPalcos` | Corredor curvo común situado detrás de los antepalcos. |
 | `enNivelPalcos` | Contorno transitable de los pisos elevados; permite conservar la cota principal al abandonar la escalera. |
+
+En el principal, el anillo arranca en `iFrontalD` (primer punto de planta pasada la boca del palco frontal) en vez del índice 0, para dejarle sitio: se recortan contra él antepecho, canto del entresuelo, separadores, sillas, portadas, apliques y antepalcos. El **suelo y el intradós siguen dando la vuelta completa** — recortarlos dejaba cuñas sin suelo entre el palco y el arranque del anillo, y `enNivelPalcos` decide por contorno, no por la geometría existente. El palco se separa 5 mm de ambas superficies para que no peleen por el mismo plano. El corredor trasero tampoco se recorta: va por x≥14,5 y nunca roza el palco.
 
 ## Puertas e interacción
 
@@ -104,7 +107,7 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 
 `construir(escena)` coordina todos los componentes. Dentro de su rama de platea también crea:
 
-- los dos palcos frontales;
+- los dos palcos frontales de platea y los del piso principal;
 - la peana y el muro portante;
 - el parquet de las alas laterales;
 - las terminaciones curvas junto a las alfombras posteriores;
@@ -137,7 +140,8 @@ Es la zona más entrelazada del archivo: valla, suelo, canto y mamparas comparte
 | `SITIOS_BUTACAS` | Lista ya calculada de todas las posiciones de butaca (centro más los dos laterales). Se resuelve una sola vez al cargar y la reutilizan tanto el instanciado de `butacas` como la colisión del modo paseo. |
 | `RESERVA_TECNICA_MEDIA` | Semianchura reservada al fondo para los cinco vanos técnicos. Debe superar el borde exterior del último arco, o la última portada de palco lo invade. |
 | `ANCHO_FRONTAL`, `DESPLAZAMIENTO_FRONTAL_X` | Fondo del palco frontal y su retranqueo hacia el muro lateral. |
-| `RETIRO_ESCENARIO_Z` | Franja reservada delante del escenario para el foso. |
+| `RETIRO_ESCENARIO_Z` | Retiro de 2,5 m, derivado de `geo.frenteEscenico`: aloja la diagonal sin recortar los palcos. |
+| `AVANCE_ALAS_EMBOCADURA` | Avance de las alas diagonales (1,5 m) hasta el comienzo fijo de los palcos frontales en z = −1 m. |
 | `Z_CORREDOR_INI`, `Z_CORREDOR_FIN` | Límites del pasillo transversal; marcan también dónde arranca el ala de platea. |
 | `ALTO_BRAZO` | Altura del brazo de butaca, algo por encima del cojín. |
 | `TELON_ANCHO`, `TELON_ALTO`, `TELON_Z`, `TELON_X_ABIERTO`, `TELON_DURACION` | Dimensiones, posición y tiempo de apertura del telón. |
@@ -148,3 +152,5 @@ Es la zona más entrelazada del archivo: valla, suelo, canto y mamparas comparte
 ## Regla para futuras modificaciones
 
 No se deben recalcular localmente los bordes de las alfombras posteriores. Hay que usar `ejeAlfombraPasillo`, `anchoAlfombraPasillo` o `bordeAlfombraPasillo`. Esto mantiene alineados alfombra, rampas, plataforma técnica y terminaciones de los palcos.
+
+La floritura de `geometriaBalaustreOrnamental` combina rombos superiores, volutas, óvalo central y hojas inferiores con filetes en relieve por ambas caras. Los calados no se solapan. La geometría se comparte por altura y se monta mediante instancias.

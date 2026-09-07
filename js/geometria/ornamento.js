@@ -134,7 +134,9 @@ function construirMamparaArcos(ancho,alto,nVanos){
    aislado, sino una pieza continua con rombos entrelazados arriba,
    volutas alrededor de un óvalo central y calados lanceolados abajo.
    Los biseles escalonados hacen legibles las molduras concéntricas. */
+var cacheBalaustresOrnamentales={};
 function geometriaBalaustreOrnamental(alto){
+  if(cacheBalaustresOrnamentales[alto])return cacheBalaustresOrnamentales[alto];
   var h=alto,w=0.34,s=new THREE.Shape();
   s.moveTo(-w/2,0);s.lineTo(w/2,0);s.lineTo(w/2,h);s.lineTo(-w/2,h);s.closePath();
 
@@ -143,13 +145,15 @@ function geometriaBalaustreOrnamental(alto){
     for(var i=1;i<puntos.length;i++)p.lineTo(puntos[i][0],puntos[i][1]*h);
     p.closePath();s.holes.push(p);
   }
-  // Dos octógonos inclinados; sus vértices interiores forman la X alta.
+  // Rombos superiores con puntas suavizadas. Se deja una franja
+  // maciza hasta las volutas para que los calados no se intersecten.
   [-1,1].forEach(function(lado){
-    var cx=lado*0.083,cy=0.805,rx=0.069,ry=0.145,c=0.012;
+    var cx=lado*0.083,cy=0.825,rx=0.066,ry=0.125;
     huecoPoligono([
-      [cx-rx+c,cy+ry],[cx+rx-c,cy+ry],[cx+rx,cy+ry-c/h],
-      [cx+rx,cy-ry+c/h],[cx+rx-c,cy-ry],[cx-rx+c,cy-ry],
-      [cx-rx,cy-ry+c/h],[cx-rx,cy+ry-c/h]
+      [cx-0.008,cy+ry-0.012],[cx+0.008,cy+ry-0.012],
+      [cx+rx,cy+0.012],[cx+rx,cy-0.012],
+      [cx+0.008,cy-ry+0.012],[cx-0.008,cy-ry+0.012],
+      [cx-rx,cy-0.012],[cx-rx,cy+0.012]
     ]);
   });
 
@@ -181,17 +185,50 @@ function geometriaBalaustreOrnamental(alto){
   // Pequeños calados de transición que separan las volutas de la X.
   [-1,1].forEach(function(lado){
     var p=new THREE.Path();
-    p.absellipse(lado*0.124,h*0.685,0.027,h*0.043,0,Math.PI*2,true);s.holes.push(p);
+    p.absellipse(lado*0.124,h*0.666,0.013,h*0.016,0,Math.PI*2,true);s.holes.push(p);
   });
-  // Un séptimo calado aligera el eje inferior, que antes seguía leyendo
+  // Un calado adicional aligera el eje inferior, que antes seguía leyendo
   // como una barra maciza al contemplar la valla desde la platea.
   var gotaInferior=new THREE.Path();
   gotaInferior.absellipse(0,h*0.185,0.018,h*0.068,0,Math.PI*2,true);s.holes.push(gotaInferior);
-  var g=new THREE.ExtrudeGeometry(s,{
+  var cuerpo=new THREE.ExtrudeGeometry(s,{
     depth:0.038, bevelEnabled:true, bevelThickness:0.005,
-    bevelSize:0.004, bevelSegments:1,curveSegments:6
+    bevelSize:0.003, bevelSegments:2,curveSegments:10
   });
-  g.translate(0,0,-0.019);
+  cuerpo.translate(0,0,-0.019);
+
+  // Filetes redondos sobre cada calado: dibujan la floritura también
+  // desde dentro del palco. Se funden en la misma geometría instanciada,
+  // sin añadir un objeto por voluta ni por repetición de la valla.
+  var partes=[cuerpo];
+  s.holes.forEach(function(hueco){
+    var puntos=hueco.getSpacedPoints(32);
+    [-1,1].forEach(function(cara){
+      var curva=new THREE.CatmullRomCurve3(puntos.slice(0,-1).map(function(p){
+        return new THREE.Vector3(p.x,p.y,cara*0.023);
+      }),true,'centripetal');
+      partes.push(new THREE.TubeGeometry(curva,32,0.0025,4,true));
+    });
+  });
+  var posiciones=[],normales=[],uvs=[];
+  partes.forEach(function(parte){
+    var plana=parte.index?parte.toNonIndexed():parte;
+    var pos=plana.getAttribute('position'),nor=plana.getAttribute('normal'),uv=plana.getAttribute('uv');
+    for(var i=0;i<pos.count;i++){
+      posiciones.push(pos.getX(i),pos.getY(i),pos.getZ(i));
+      normales.push(nor.getX(i),nor.getY(i),nor.getZ(i));
+      uvs.push(uv.getX(i),uv.getY(i));
+    }
+    if(plana!==parte)plana.dispose();
+    parte.dispose();
+  });
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(posiciones,3));
+  g.setAttribute('normal',new THREE.Float32BufferAttribute(normales,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
+  g.computeBoundingBox();
+  g.computeBoundingSphere();
+  cacheBalaustresOrnamentales[alto]=g;
   return g;
 }
 
