@@ -57,13 +57,21 @@ var texNogalPatio=textura('Textures/NogalButacaPatioGenerado.png',1,1);
 var texTejidoPatio=textura('Textures/TerciopeloButacaPatioGenerado.png',1,1);
 
 var MAT = {
-  estucoPilastra:new THREE.MeshLambertMaterial({map:texEstucoPilastra,color:0xe1d4b6}),
+  // La imagen aporta solo el microrrelieve; el color coincide con el
+  // blanco roto de las piezas mudéjares. Se oscurece en el albedo porque
+  // sobre la embocadura se suman tres luces cálidas y un valor más alto
+  // termina recortado a blanco puro.
+  estucoPilastra:new THREE.MeshLambertMaterial({bumpMap:texEstucoPilastra,
+                   bumpScale:0.012,color:0x817b70}),
   piedraPilastra:new THREE.MeshLambertMaterial({map:texPiedraPilastra,color:0xc4c4c4}),
   terciopeloButaca: matTerciopeloButaca,
   maderaButaca:     new THREE.MeshLambertMaterial({map:texMaderaButaca}),
   // Acabado mate, acorde con la carpintería envejecida de la sala.
-  maderaButacaPatio:new THREE.MeshLambertMaterial({map:texNogalPatio}),
-  tapizadoButacaPatio:new THREE.MeshLambertMaterial({map:texTejidoPatio}),
+  // Ambos albedos se compensan para las luces cálidas del patio: sin
+  // este tinte la madera vira a naranja y el terciopelo a rojo carmín.
+  maderaButacaPatio:new THREE.MeshLambertMaterial({map:texMaderaButaca}),
+  tapizadoButacaPatio:new THREE.MeshLambertMaterial({map:texTerciopelo,
+                       color:new THREE.Color(0.90,1,1)}),
   // Tinte ligeramente gris para conservar la veta sin quemarla bajo los
   // numerosos focos cálidos de los palcos.
   maderaBlanca:     new THREE.MeshLambertMaterial({map:texMaderaBlanca, color:0xb0a99b, side:THREE.DoubleSide}),
@@ -99,9 +107,11 @@ var MAT = {
   // profundidad (no en el mundo): el pequeño y+0.06 de alfombra() ya no
   // basta él solo para evitar el parpadeo/hundimiento con el parquet al
   // verla de lejos o en rasante, así que se combinan las dos.
-  alfombra:   new THREE.MeshLambertMaterial({map:texAlfombra, side:THREE.DoubleSide,
+  // Granate apagado: conserva el pelo fotografiado sin convertirse en
+  // una franja roja luminosa bajo las luces cálidas del patio.
+  alfombra:   new THREE.MeshLambertMaterial({map:texAlfombra,color:0x73545a,side:THREE.DoubleSide,
                  polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4}),
-  alfombraEscalera:new THREE.MeshLambertMaterial({map:texAlfombraEscalera, side:THREE.DoubleSide,
+  alfombraEscalera:new THREE.MeshLambertMaterial({map:texAlfombraEscalera,color:0x73545a,side:THREE.DoubleSide,
                  polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-4}),
   muro:       new THREE.MeshLambertMaterial({color:0x2a1519, side:THREE.DoubleSide}),
   antepecho:  new THREE.MeshLambertMaterial({color:0x6b2226, side:THREE.DoubleSide}),

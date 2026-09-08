@@ -342,8 +342,9 @@ function butacas(){
   var geoFileteI=FALLA.piezas.geometriaReposabrazos(); geoFileteI.translate(-X_BRAZO,0,-0.015);
   var geoFileteD=FALLA.piezas.geometriaReposabrazos(); geoFileteD.translate(X_BRAZO,0,-0.015);
 
-  // Todas las butacas son iguales: un único material de terciopelo y
-  // uno de madera para las 326 (8 draw calls en total, no una por butaca).
+  // Las piezas conservan materiales compartidos, pero reciben una
+  // variación mínima y determinista por asiento para que las filas no
+  // repitan exactamente el mismo color y silueta.
   var piezas=[
     {g:geoRespaldoMadera, m:MAT.maderaButacaPatio},
     {g:geoRespaldo,       m:MAT.tapizadoButacaPatio},
@@ -356,17 +357,26 @@ function butacas(){
   ];
 
   var grupo=new THREE.Group(), m4=new THREE.Matrix4(), q=new THREE.Quaternion(),
-      pos3=new THREE.Vector3(), esc=new THREE.Vector3(1,1,1);
+      ejeY=new THREE.Vector3(0,1,0), pos3=new THREE.Vector3(), esc=new THREE.Vector3(),
+      colorInstancia=new THREE.Color();
 
   piezas.forEach(function(p){
     var im=new THREE.InstancedMesh(p.g, p.m, sitios.length);
     for(var i=0;i<sitios.length;i++){
       var s=sitios[i];
+      var semilla=(i*37+Math.round((s.x+20)*17)+Math.round(s.z*13))%17;
+      var variacion=(semilla-8)/8;
       pos3.set(s.x, geo.rake(s.z), s.z);
-      m4.compose(pos3,q,esc); // q = identidad: todas las butacas miran hacia el escenario
+      q.setFromAxisAngle(ejeY,variacion*0.008);
+      esc.set(1+variacion*0.008,1+variacion*0.006,1+variacion*0.004);
+      m4.compose(pos3,q,esc);
       im.setMatrixAt(i,m4);
+      var tono=0.94+variacion*0.045;
+      colorInstancia.setRGB(tono,tono*(p.m===MAT.tapizadoButacaPatio?0.985:1),tono);
+      im.setColorAt(i,colorInstancia);
     }
     im.instanceMatrix.needsUpdate=true;
+    im.instanceColor.needsUpdate=true;
     grupo.add(im);
   });
 
@@ -463,9 +473,9 @@ function embocadura(){
   ].forEach(function(b){g.add(cintaArcoRebajado(b.dy,b.h,b.z,b.m));});
 
   var cremaPilastra=MAT.estucoPilastra;
-  var panelPilastra=MAT.estucoPilastra.clone(); panelPilastra.color.setHex(0xccb98f);
+  var panelPilastra=MAT.estucoPilastra.clone(); panelPilastra.color.setHex(0x777166);
   var marcoPilastra=new THREE.MeshLambertMaterial({color:0x48453d});
-  var relievePilastra=MAT.estucoPilastra.clone(); relievePilastra.color.setHex(0xfff3d4);
+  var relievePilastra=MAT.estucoPilastra.clone(); relievePilastra.color.setHex(0xaaa397);
   var piedraPilastra=MAT.piedraPilastra;
   // Cada pilastra completa sigue el ala diagonal. Su eje vertical se
   // conserva; el giro es en planta, con base, panel y capitel solidarios.
@@ -534,11 +544,15 @@ function embocadura(){
       var cap=new THREE.Mesh(new THREE.BoxGeometry(c.w,c.h,c.d),cremaPilastra);
       cap.position.set(x,c.y,0.30); lateral.add(cap);
     });
-    // Arquivoltas verticales paralelas a cada jamba.
-    [0.00,0.28,0.54].forEach(function(dx,j){
-      var banda=new THREE.Mesh(new THREE.BoxGeometry(j===1?0.18:0.14,7.35,0.15),j===1?MAT.embocaduraCrema:MAT.oro);
-      banda.position.set(s*dx,4.48,0.48+j*0.025); lateral.add(banda);
-    });
+    /* Filete vertical de la jamba. Eran tres bandas —dos de oro y una de
+       crema— heredadas de la pilastra anterior, y se habían quedado en el
+       sistema de coordenadas viejo: se colocaban en s*dx, no en x=s*0,78
+       como el resto de la pieza. Las de oro caían así fuera del fuste,
+       sobre la boca, y con el emisivo de MAT.oro se leían como una cara
+       amarilla plana por delante del estuco. Queda sólo la de crema, que
+       sí acompaña al fuste y hace de moldura sobre su cara interior. */
+    var filete=new THREE.Mesh(new THREE.BoxGeometry(0.18,7.35,0.15),MAT.embocaduraCrema);
+    filete.position.set(s*0.28,4.48,0.505); lateral.add(filete);
     // El basamento nace sobre las tablas; la coronación conserva su
     // encuentro con el arco superior al ajustar la altura de la pilastra.
     lateral.position.set(s*P.arcoA,geo.escenario.altura,0);
@@ -546,7 +560,7 @@ function embocadura(){
     // Proyección por metros en cada cara: una misma densidad de grano
     // en el fuste alto, sus molduras y el basamento, sin estiramientos.
     lateral.traverse(function(malla){
-      if(!malla.isMesh || !malla.material.map)return;
+      if(!malla.isMesh || (!malla.material.map && !malla.material.bumpMap))return;
       var geometria=malla.geometry,p=geometria.attributes.position;
       var normal=geometria.attributes.normal,uv=geometria.attributes.uv;
       for(var i=0;i<p.count;i++){
@@ -2484,11 +2498,18 @@ function construir(escena){
         var entresuelo=new THREE.Group();
         entresuelo.name='entresueloDecorativoPrincipal';
         var yBajo=piso.y-P.entresueloPrincipal;
-        // Intradós y trasdós siguen dando la vuelta completa: recortarlos
-        // dejaba cuñas sin suelo entre el palco y el arranque del anillo.
-        entresuelo.add(banda(borde,geo.PLAN,yBajo,yBajo,MAT.yeso));
+        /* Intradós: es el techo real de los palcos de platea —ellos no
+           llevan tapa propia, se abren hasta esta cara— y a la vez el
+           fondo de la balconada visto desde todo el patio. Por eso lleva
+           MAT.techoPalco y no el yeso liso de los testeros. banda() da
+           UV por longitud recorrida, así que el dibujo cae a la misma
+           escala a lo largo del anillo que a lo ancho de la losa.
+
+           Intradós y trasdós siguen dando la vuelta completa: recortarlos
+           dejaba cuñas sin suelo entre el palco y el arranque del anillo. */
+        entresuelo.add(banda(borde,geo.PLAN,yBajo,yBajo,MAT.techoPalco));
         // Solo el canto orientado al patio recibe el paño moldurado;
-        // intradós, trasdós y testeros conservan su material independiente.
+        // trasdós y testeros conservan su material independiente.
         entresuelo.add(cinta(bordeAnillo,yBajo,piso.y,MAT.entresueloFrente));
         entresuelo.add(cinta(geo.PLAN,yBajo,piso.y,MAT.yeso));
         entresuelo.add(cinta([bordeAnillo[0],planAnillo[0]],yBajo,piso.y,MAT.yeso));
