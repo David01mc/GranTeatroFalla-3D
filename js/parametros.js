@@ -21,8 +21,8 @@ var P = {
   anchoPasilloPalcos: 3.90, // corredor posterior (antes 3.00 m; +30 %)
   entresueloPrincipal: 0.25, // espesor decorativo entre 4.10 y 4.35 m
   pisos: [           // y del piso, y del antepecho, retranqueo, nº de palcos
-    {y:0.00, alto:1.15, dentro:2.90, palcos:0, palcosLado:9, nombre:'platea'},
-    {y:4.35, alto:1.15, dentro:2.10, palcos:22, palcosLado:11, nombre:'principal'},
+    {y:0.00, alto:1.15, dentro:2.90, palcos:0, palcosLado:8, nombre:'platea'},
+    {y:4.35, alto:1.15, dentro:2.10, palcos:20, palcosLado:10, nombre:'principal'},
     /* El segundo sube de 6,70 a 7,10 y el paraíso de 9,60 a 9,90. Con las
        cotas anteriores el principal se quedaba en 2,35 m libres —el
        mínimo de la sala, 53 cm por debajo de los palcos de platea que

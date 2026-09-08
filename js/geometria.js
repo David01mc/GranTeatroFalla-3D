@@ -591,14 +591,6 @@ function embocadura(){
       }
     });
     cadena.instanceMatrix.needsUpdate=true;lateral.add(cadena);
-    // Pequeño florón central: hojas en relieve y tallo fino.
-    for(var hoja=0;hoja<6;hoja++){
-      var ang=hoja*Math.PI/3;
-      var petalo=new THREE.Mesh(new THREE.SphereGeometry(1,8,6),relievePilastra);
-      petalo.scale.set(0.026,0.073,0.015);petalo.rotation.z=-ang;
-      petalo.position.set(x+0.065*Math.sin(ang),4.04+0.10*Math.cos(ang),0.693);
-      lateral.add(petalo);
-    }
     marco(1.46,0.065,0.84,0.63,0.02,marcoPilastra);
     [
       {y:7.72,w:1.62,h:0.22,d:0.68},
@@ -1094,6 +1086,9 @@ function lampara(){
    dos cortes "equiespaciados en índice" pueden caer casi en el mismo
    sitio físico. */
 function indicesPorLongitud(plan, ini, fin, n){
+  if(plan.cortesPalcos && ini===0 && fin===plan.length-1 && plan.cortesPalcos.length===n+1){
+    return plan.cortesPalcos.slice();
+  }
   var acc=[0], i;
   for(i=ini+1;i<=fin;i++) acc.push(acc[acc.length-1]+Math.hypot(plan[i].x-plan[i-1].x, plan[i].z-plan[i-1].z));
   var total=acc[acc.length-1], out=[ini];
@@ -1104,6 +1099,35 @@ function indicesPorLongitud(plan, ini, fin, n){
   }
   out.push(fin);
   return out;
+}
+
+/* Muestrea ambos lados de la platea con la misma interpolación. Cada
+   palco ocupa exactamente 1/n del recorrido del muro; también se
+   conservan sus vértices originales para no recortar las esquinas. */
+function repartoUniformePlatea(plan,borde,ini,fin,n){
+  var acc=[0],i;
+  for(i=ini+1;i<=fin;i++)acc.push(acc[acc.length-1]+Math.hypot(
+    plan[i].x-plan[i-1].x,plan[i].z-plan[i-1].z));
+  var total=acc[acc.length-1],muestras=acc.map(function(d){return {d:d};});
+  for(i=0;i<=n*16;i++)muestras.push({d:total*i/(n*16),corte:i%16===0?i/16:null});
+  muestras.sort(function(a,b){return a.d-b.d;});
+  var exterior=[],interior=[],cortes=[],j=0;
+  muestras.forEach(function(m){
+    if(exterior.length && Math.abs(m.d-exterior[exterior.length-1].distancia)<1e-8){
+      if(m.corte!=null)cortes[m.corte]=exterior.length-1;
+      return;
+    }
+    while(j<acc.length-2 && acc[j+1]<m.d)j++;
+    var t=(m.d-acc[j])/(acc[j+1]-acc[j]||1);
+    function interp(linea){
+      var a=linea[ini+j],b=linea[ini+j+1];
+      return {x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t};
+    }
+    var p=interp(plan);p.distancia=m.d;exterior.push(p);interior.push(interp(borde));
+    if(m.corte!=null)cortes[m.corte]=exterior.length-1;
+  });
+  exterior.cortesPalcos=cortes;
+  return {plan:exterior,borde:interior};
 }
 
 /* Separador bajo entre dos palcos. Su perfil reproduce las piezas de la
@@ -2560,7 +2584,7 @@ function construir(escena){
   //  - El Antepalco: un hueco/pasillo de salida entre el Palco Frontal y
   //    el primer palco de la platea, sin suelo ni peana propios todavía
   //    (se dejará listo para puerta/pasillo más adelante).
-  //  - El ala de la platea en sí: los 9 palcos por lado sobre la peana
+  //  - El ala de la platea en sí: los 8 palcos por lado sobre la peana
   //    normal, empezando ya pasado el Antepalco.
   var ALTURA_FRONTAL = geo.accesoPalcoFrontal.altura;
   var ELEVACION_PLATEA = 0.40;                      // peana normal del resto del ala
@@ -2623,7 +2647,7 @@ function construir(escena){
         function(p){return geo.rake(p.z);});
 
       // El ala en sí (peana+barandilla+suelo+moldura continuos, y dentro,
-      // los 9 palcos tabicados con sus sillas), de iAla a corte y de
+      // los 8 palcos tabicados con sus sillas), de iAla a corte y de
       // corte a iAla especular — así el Antepalco (de iArco a iAla) y el
       // hueco central (de corteD a corteI) quedan sin construir.
       var bAla=borde.slice(iAlaD,iAlaI+1), plAla=geo.PLAN.slice(iAlaD,iAlaI+1);
@@ -2682,18 +2706,18 @@ function construir(escena){
       escena.add(banda(
         borde.slice(remateI,iAlaI+1),geo.PLAN.slice(remateI,iAlaI+1),
         yPiso,yPiso,MAT.parquetPlatea));
-      separadoresPalco(escena, borde, geo.PLAN, iAlaD, corteD, piso.palcosLado, yPiso, piso.alto);
-      separadoresPalco(escena, borde, geo.PLAN, corteI, iAlaI, piso.palcosLado, yPiso, piso.alto);
       remateHaciaAlfombra(escena, borde,
         {derecha:remateD, izquierda:remateI},
         {derecha:extremoVallaD, izquierda:extremoVallaI},
         ALTURA_PLATEA, yPiso);
-      sillasPalco(escena, borde, geo.PLAN, iAlaD, corteD, piso.palcosLado, yPiso, sillaPalcoGeo);
-      sillasPalco(escena, borde, geo.PLAN, corteI, iAlaI, piso.palcosLado, yPiso, sillaPalcoGeo);
-      portadasPalcosPlatea(escena, borde, geo.PLAN, iAlaD, corteD, piso.palcosLado, yPiso);
-      portadasPalcosPlatea(escena, borde, geo.PLAN, corteI, iAlaI, piso.palcosLado, yPiso);
-      antepalcosPlatea(escena, geo.PLAN, iAlaD, corteD, piso.palcosLado, yPiso);
-      antepalcosPlatea(escena, geo.PLAN, corteI, iAlaI, piso.palcosLado, yPiso);
+      [[iAlaD,corteD],[corteI,iAlaI]].forEach(function(limites){
+        var reparto=repartoUniformePlatea(geo.PLAN,borde,limites[0],limites[1],piso.palcosLado);
+        var plan=reparto.plan,frente=reparto.borde,fin=plan.length-1;
+        separadoresPalco(escena,frente,plan,0,fin,piso.palcosLado,yPiso,piso.alto);
+        sillasPalco(escena,frente,plan,0,fin,piso.palcosLado,yPiso,sillaPalcoGeo);
+        portadasPalcosPlatea(escena,frente,plan,0,fin,piso.palcosLado,yPiso);
+        antepalcosPlatea(escena,plan,0,fin,piso.palcosLado,yPiso);
+      });
       pasilloCurvoPalcos(escena,geo.PLAN,iAlaD,iAlaI,yPiso);
       salidasEscalerasPasillo(escena,ALTURA_PLATEA);
     } else {
@@ -2781,32 +2805,25 @@ function construir(escena){
          y lo mismo vale para el segundo y el paraíso. */
       escena.add(banda(borde,planPiso,yPiso,yPiso,MAT.suelo));              // suelo del palco
       if(n===1){
-        // Once palcos por lado. El tramo central posterior queda
+        // Diez palcos por lado. El tramo central posterior queda
         // reservado al palco de autoridades, no recibe separadores.
         var limiteAutoridadD=-1;
         for(var ia=0;ia<geo.PLAN.length;ia++){
           if(geo.PLAN[ia].x<=4.4){limiteAutoridadD=ia;break;}
         }
         var limiteAutoridadI=geo.PLAN.length-1-limiteAutoridadD;
-        apliquesEntresuelo(escena,borde,geo.PLAN,iFrontalD,limiteAutoridadD,
-          piso.palcosLado,piso.y-P.entresueloPrincipal/2);
-        apliquesEntresuelo(escena,borde,geo.PLAN,limiteAutoridadI,iFrontalI,
-          piso.palcosLado,piso.y-P.entresueloPrincipal/2);
-        separadoresPalco(escena,borde,geo.PLAN,iFrontalD,limiteAutoridadD,piso.palcosLado,piso.y,piso.alto);
-        separadoresPalco(escena,borde,geo.PLAN,limiteAutoridadI,iFrontalI,piso.palcosLado,piso.y,piso.alto);
-        sillasPalco(escena,borde,geo.PLAN,iFrontalD,limiteAutoridadD,piso.palcosLado,yPiso,sillaPalcoGeo);
-        sillasPalco(escena,borde,geo.PLAN,limiteAutoridadI,iFrontalI,piso.palcosLado,yPiso,sillaPalcoGeo);
-        portadasPalcosPlatea(escena,borde,geo.PLAN,iFrontalD,limiteAutoridadD,
-          piso.palcosLado,yPiso,P.pisos[2].y);
-        portadasPalcosPlatea(escena,borde,geo.PLAN,limiteAutoridadI,iFrontalI,
-          piso.palcosLado,yPiso,P.pisos[2].y);
+        [[iFrontalD,limiteAutoridadD],[limiteAutoridadI,iFrontalI]].forEach(function(limites){
+          var reparto=repartoUniformePlatea(geo.PLAN,borde,limites[0],limites[1],piso.palcosLado);
+          var plan=reparto.plan,frente=reparto.borde,fin=plan.length-1;
+          apliquesEntresuelo(escena,frente,plan,0,fin,piso.palcosLado,piso.y-P.entresueloPrincipal/2);
+          separadoresPalco(escena,frente,plan,0,fin,piso.palcosLado,piso.y,piso.alto);
+          sillasPalco(escena,frente,plan,0,fin,piso.palcosLado,yPiso,sillaPalcoGeo);
+          portadasPalcosPlatea(escena,frente,plan,0,fin,piso.palcosLado,yPiso,P.pisos[2].y);
+          antepalcosPlatea(escena,plan,0,fin,piso.palcosLado,yPiso,P.pisos[2].y,1);
+        });
         palcoAutoridades(escena,sillaPalcoGeo,piso.y);
         // Segundo nivel transitable: antepalcos laterales con puertas y
         // corredor continuo, a la cota superior del entresuelo.
-        antepalcosPlatea(escena,geo.PLAN,iFrontalD,limiteAutoridadD,piso.palcosLado,
-          yPiso,P.pisos[2].y,1);
-        antepalcosPlatea(escena,geo.PLAN,limiteAutoridadI,iFrontalI,piso.palcosLado,
-          yPiso,P.pisos[2].y,1);
         pasilloCurvoPalcos(escena,geo.PLAN,0,geo.PLAN.length-1,
           yPiso,P.pisos[2].y,1);
       }else if(n===NIVEL_ANFI){
