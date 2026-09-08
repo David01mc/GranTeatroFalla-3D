@@ -22,7 +22,13 @@ var camara=null, elemento=null;
 var yaw=0, pitch=0;
 var teclas={};
 var x=0, z=0;               // posición horizontal del jugador
-var nivelActual=0;           // 0=platea, 1=principal (suelo a 4,35 m)
+var nivelActual=0;           // 0=platea, 1=principal (4,35 m), 2=segundo (6,70 m)
+/* Cota de los pies en el fotograma anterior. La caja de escalera tiene
+   ahora dos cotas pisables sobre un mismo punto —los vuelos altos van
+   encima de los bajos—, y ésta es la referencia con la que se decide
+   cuál se está pisando. Un fotograma de retraso a paso normal son unos
+   dos centímetros, muy por debajo de la huella. */
+var yPie=0;
 var alturaSalto=0, velocidadSalto=0;
 var sentado=null;
 var alSalirCb=null;
@@ -52,14 +58,16 @@ function terrenoAltura(x,z){
   // La caja es la única zona que cambia de planta. Mientras se recorren
   // sus peldaños conserva la altura exacta; al cruzar su mitad recuerda
   // qué corredor debe resolver cuando se abandone el último escalón.
-  var alturaCaja=geo.alturaCajaEscalera(x,z);
+  var c=geo.cajaEscalera;
+  var alturaCaja=geo.alturaCajaEscalera(x,z,yPie);
   if(alturaCaja!==null){
-    nivelActual=alturaCaja>(geo.cajaEscalera.baseY+geo.cajaEscalera.primerPisoY)/2?1:0;
+    nivelActual = alturaCaja>(c.primerPisoY+c.segundoPisoY)/2 ? 2
+                : alturaCaja>(c.baseY+c.primerPisoY)/2       ? 1 : 0;
     return alturaCaja;
   }
 
-  if(nivelActual===1){
-    if(geo.enNivelPalcos(1,x,z))return geo.P.pisos[1].y;
+  if(nivelActual>=1){
+    if(geo.enNivelPalcos(nivelActual,x,z))return geo.P.pisos[nivelActual].y;
     return null;
   }
 
@@ -183,7 +191,11 @@ function entrar(camaraRef, el, cb){
     elemento._paseoRecaptura=true;
   }
   x=camara.position.x; z=camara.position.z;
-  nivelActual=(geo.enNivelPalcos(1,x,z) && camara.position.y>geo.P.pisos[1].y)?1:0;
+  yPie=camara.position.y-ALTURA_OJO;
+  nivelActual=0;
+  for(var nv=2;nv>=1;nv--){
+    if(geo.enNivelPalcos(nv,x,z) && camara.position.y>geo.P.pisos[nv].y){ nivelActual=nv; break; }
+  }
 
   camara.getWorldDirection(vDir);
   yaw = Math.atan2(-vDir.x, -vDir.z);
@@ -237,6 +249,7 @@ function actualizar(dt){
 
   var suelo = terrenoAltura(x,z);
   if(suelo===null) suelo = geo.rake(z); // colchón de seguridad, no debería alcanzarse
+  yPie = suelo;                          // referencia para resolver la caja
 
   camara.position.set(x, suelo+(sentado?1.16:ALTURA_OJO+alturaSalto), z);
   camara.rotation.set(pitch, yaw, 0, 'YXZ');

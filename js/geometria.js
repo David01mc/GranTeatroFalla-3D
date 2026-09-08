@@ -1637,7 +1637,7 @@ function pasilloCurvoPalcos(escena,plan,ini,fin,yBase,yTecho,nivel){
   nivel=nivel||0;
   var interior=geo.dentro(plan,-2.0).slice(ini,fin+1);
   var exterior=geo.dentro(plan,-(2.0+P.anchoPasilloPalcos)).slice(ini,fin+1);
-  if(nivel===1 && ini===0 && fin===plan.length-1){
+  if(nivel>=1 && ini===0 && fin===plan.length-1){
     /* Losa del principal con dos huecos reales para las escaleras. Una
        banda de quads continua tapaba el último vuelo visto desde abajo. */
     var forma=new THREE.Shape();
@@ -1648,9 +1648,10 @@ function pasilloCurvoPalcos(escena,plan,ini,fin,yBase,yTecho,nivel){
     var cEsc=geo.cajaEscalera;
     [-1,1].forEach(function(signo){
       var hueco=new THREE.Path();
-      var xa=signo>0?cEsc.xMin:-cEsc.xMin,xb=signo>0?cEsc.pretil.xMax:-cEsc.pretil.xMax;
+      var h=cEsc.huecoLosa;
+      var xa=signo*h.xMin,xb=signo*h.xMax;
       var x0=Math.min(xa,xb)+0.02,x1=Math.max(xa,xb)-0.02;
-      var z0=cEsc.tramos[2].z0+0.03,z1=cEsc.zMax+0.02;
+      var z0=h.zMin+0.03,z1=h.zMax+0.02;
       hueco.moveTo(x0,z0);hueco.lineTo(x0,z1);hueco.lineTo(x1,z1);hueco.lineTo(x1,z0);hueco.closePath();
       forma.holes.push(hueco);
     });
@@ -1684,7 +1685,9 @@ function pasilloCurvoPalcos(escena,plan,ini,fin,yBase,yTecho,nivel){
 function cajaEscaleraPrimerPiso(signo){
   var g=new THREE.Group(),c=geo.cajaEscalera;
   g.name='cajaEscalera'+(signo>0?'D':'I');
-  var altoMuro=P.pisos[2].y-c.baseY-0.10,espesor=0.18;
+  // Los muros suben ahora hasta el paraíso: el hueco sirve dos plantas y
+  // la galería de llegada al segundo está a 6,70.
+  var altoMuro=P.pisos[3].y-c.baseY-0.10,espesor=0.18,CANTO=0.28;
 
   /* Toda la sala se define en x positivo; el ala izquierda es su
      reflejo, y reflejar una caja equivale a invertir su giro. */
@@ -1713,14 +1716,20 @@ function cajaEscaleraPrimerPiso(signo){
 
   // Cada peldaño es una caja maciza desde la solera hasta su huella. La
   // alfombra cubre huella y contrahuella con un pequeño margen lateral.
+  /* Los vuelos de la tanda baja son macizos desde la solera: así la cota
+     pisable que publica alturaCajaEscalera coincide con lo que se ve, sin
+     huecos por debajo. Los de la tanda alta van encima de ellos, de modo
+     que no pueden nacer de la solera —se tragarían los de abajo—: son
+     losa inclinada de CANTO metros y se camina por debajo. */
   c.tramos.forEach(function(t){
     var vx=t.x1-t.x0,vz=t.z1-t.z0,L=Math.hypot(vx,vz),ux=vx/L,uz=vz/L;
-    var paso=L/c.peldanos,rot=-Math.atan2(vz,vx),subida=(t.y1-t.y0)/c.peldanos;
-    for(var i=0;i<c.peldanos;i++){
-      var s0=i/c.peldanos,s1=(i+1)/c.peldanos;
+    var nPel=t.peldanos||c.peldanos;
+    var paso=L/nPel,rot=-Math.atan2(vz,vx),subida=(t.y1-t.y0)/nPel;
+    for(var i=0;i<nPel;i++){
+      var s0=i/nPel,s1=(i+1)/nPel;
       var x0=t.x0+vx*s0,z0=t.z0+vz*s0,x1=t.x0+vx*s1,z1=t.z0+vz*s1;
-      var y=t.y0+subida*(i+1),alto=y-c.baseY;
-      caja(paso+0.012,alto,c.anchoTramo,(x0+x1)/2,c.baseY+alto/2,(z0+z1)/2,MAT.muro,rot);
+      var y=t.y0+subida*(i+1),alto=t.nivel?CANTO:y-c.baseY;
+      caja(paso+0.012,alto,c.anchoTramo,(x0+x1)/2,y-alto/2,(z0+z1)/2,MAT.muro,rot);
       caja(paso-0.012,0.026,c.anchoTramo-0.08,(x0+x1)/2,y+0.013,(z0+z1)/2,MAT.alfombraEscalera,rot);
       caja(0.026,subida-0.010,c.anchoTramo-0.08,x0-ux*0.013,y-subida/2,z0-uz*0.013,MAT.alfombraEscalera,rot);
     }
@@ -1728,9 +1737,10 @@ function cajaEscaleraPrimerPiso(signo){
 
   // Rellanos macizos con alfombra continua para marcar el giro.
   c.rellanos.forEach(function(r){
-    var ancho=r.xMax-r.xMin,fondo=r.zMax-r.zMin,alto=r.y-c.baseY;
+    var ancho=r.xMax-r.xMin,fondo=r.zMax-r.zMin;
+    var alto=r.nivel?CANTO:r.y-c.baseY;      // mismo criterio que los vuelos
     var cx=(r.xMin+r.xMax)/2,cz=(r.zMin+r.zMax)/2;
-    caja(ancho,alto,fondo,cx,c.baseY+alto/2,cz,MAT.muro);
+    caja(ancho,alto,fondo,cx,r.y-alto/2,cz,MAT.muro);
     caja(ancho-0.08,0.026,fondo-0.08,cx,r.y+0.013,cz,MAT.alfombraEscalera);
   });
 
@@ -1739,16 +1749,16 @@ function cajaEscaleraPrimerPiso(signo){
   // caen justo sobre el borde y el redondeo podría dejarlos fuera.
   c.bordesInteriores.forEach(function(linea,indice){
     var t=c.tramos[indice],vx=t.x1-t.x0,vz=t.z1-t.z0,L2=vx*vx+vz*vz;
-    var puntos=[],j;
-    for(j=0;j<=c.peldanos;j++){
-      puntos.push({x:signo*(linea[0].x+(linea[1].x-linea[0].x)*j/c.peldanos),
-                   z:linea[0].z+(linea[1].z-linea[0].z)*j/c.peldanos});
+    var puntos=[],j,nb=t.peldanos||c.peldanos;
+    for(j=0;j<=nb;j++){
+      puntos.push({x:signo*(linea[0].x+(linea[1].x-linea[0].x)*j/nb),
+                   z:linea[0].z+(linea[1].z-linea[0].z)*j/nb});
     }
     barandillaPalco(g,puntos,function(p){
       var s=((Math.abs(p.x)-t.x0)*vx+(p.z-t.z0)*vz)/L2;
       s=Math.max(0,Math.min(1,s));
-      var escalon=Math.min(c.peldanos-1,Math.floor(s*c.peldanos));
-      return t.y0+(t.y1-t.y0)*(escalon+1)/c.peldanos;
+      var escalon=Math.min(nb-1,Math.floor(s*nb));
+      return t.y0+(t.y1-t.y0)*(escalon+1)/nb;
     },0.92);
   });
 
@@ -1780,6 +1790,19 @@ function salidasEscalerasPasillo(escena,altura){
     // por el mismo plano donde se solapan.
     var suelo=new THREE.Mesh(new THREE.BoxGeometry(largo,altura-0.005,e.ancho),MAT.parquetPlatea);
     suelo.position.set(signo*(xIni+xFin)/2,(altura-0.005)/2,e.centroZ);escena.add(suelo);
+
+    /* Vestíbulo entre el pasillo y la boca de la caja. La caja se retiró
+       60 cm para no amontonar sus dos desembarcos contra el pasillo, y
+       ese trozo hay que pavimentarlo o queda una barrera invisible justo
+       en la entrada. Va sólo en el tramo de x de la caja: más adentro
+       esa franja ya es sala. */
+    var cE=geo.cajaEscalera, zSur=cE.zMax, zNorte=e.centroZ-e.ancho/2;
+    if(zNorte>zSur+0.001){
+      var vest=new THREE.Mesh(
+        new THREE.BoxGeometry(cE.xMax-cE.xMin,altura-0.005,zNorte-zSur),MAT.parquetPlatea);
+      vest.position.set(signo*(cE.xMin+cE.xMax)/2,(altura-0.005)/2,(zSur+zNorte)/2);
+      escena.add(vest);
+    }
 
     // La flecha señala hacia -z, que es el lado por el que ahora se abre
     // la caja de escalera; el giro del cartel invierte el sentido en el
@@ -2563,6 +2586,27 @@ function construir(escena){
           yPiso,P.pisos[2].y,1);
       }else if(piso.palcos){
         separadoresPalco(escena,borde,planPiso,0,borde.length-1,piso.palcos,piso.y,piso.alto);
+        if(n===2){
+          /* Circulación del segundo piso. Su anillo estaba construido
+             pero era inalcanzable: ni escalera, ni corredor, ni puertas.
+             Sus palcos frontales son la prolongación del propio anillo
+             hasta la pared (ver uneContornoAPared más arriba), así que en
+             cuanto hay corredor y antepalco se llega a ellos caminando
+             por la balconada, sin pasaje aparte. Se le da el mismo par
+             que ya tiene el principal, a la cota de este piso. */
+          var celdasSegundo=Math.max(1,Math.round(piso.palcos/2));
+          var iCentroSegundo=0;
+          for(var ic2=0;ic2<geo.PLAN.length;ic2++){
+            if(geo.PLAN[ic2].x<=4.4){ iCentroSegundo=ic2; break; }
+          }
+          var iCentroSegundoI=geo.PLAN.length-1-iCentroSegundo;
+          antepalcosPlatea(escena,geo.PLAN,0,iCentroSegundo,celdasSegundo,
+            yPiso,P.pisos[3].y,2);
+          antepalcosPlatea(escena,geo.PLAN,iCentroSegundoI,geo.PLAN.length-1,celdasSegundo,
+            yPiso,P.pisos[3].y,2);
+          pasilloCurvoPalcos(escena,geo.PLAN,0,geo.PLAN.length-1,
+            yPiso,P.pisos[3].y,2);
+        }
       }
     }
   });
