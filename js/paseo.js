@@ -44,7 +44,9 @@ function terrenoAltura(x,z){
     var pendiente=boca.avance/(boca.xEncuentro-geo.P.arcoA);
     var zMuro=-boca.retiro+Math.min(ax-geo.P.arcoA,boca.xEncuentro-geo.P.arcoA)*pendiente;
     var margen=0.35*(ax<boca.xEncuentro?Math.hypot(1,pendiente):1);
-    if(Math.abs(z-zMuro)<margen) return null;
+    var acceso=geo.accesoPalcoFrontal;
+    var pasoPosterior=nivelActual===0 && ax>acceso.pasoMin+0.28 && ax<acceso.pasoMax-0.28;
+    if(Math.abs(z-zMuro)<margen && !pasoPosterior) return null;
   }
   var esc=geo.escenario;
   if(ax <= esc.mitadX){
@@ -70,6 +72,9 @@ function terrenoAltura(x,z){
     if(geo.enNivelPalcos(nivelActual,x,z))return geo.P.pisos[nivelActual].y;
     return null;
   }
+
+  var alturaPalcoFrontal=geo.alturaAccesoPalcoFrontal(x,z);
+  if(alturaPalcoFrontal!==null) return alturaPalcoFrontal;
 
   var alturaEscalera=geo.alturaEscaleraLateral(x,z);
   if(alturaEscalera!==null) return alturaEscalera;

@@ -34,8 +34,11 @@ var P = {
        Los arcos de las portadas del principal cuelgan de esta misma cota
        (ver portadasPalcosPlatea, que recibe P.pisos[2].y como techo), de
        modo que suben con ella: de 2,01 a 2,41 m de luz. */
-    {y:7.10, alto:1.10, dentro:2.70, palcos:20, nombre:'segundo'},
-    {y:9.90, alto:1.05, dentro:3.30, palcos:0,  nombre:'paraíso'}
+    /* `alto` incluye ahora la moldura de oro, que antes se apilaba encima:
+       1,15 en el segundo lo deja a la misma altura de valla que el
+       principal, y 1,19 en el paraíso conserva la que ya tenía. */
+    {y:7.10, alto:1.15, dentro:2.70, palcos:12, nombre:'segundo'},   // 6 por ala en el arco delantero
+    {y:9.90, alto:1.19, dentro:3.30, palcos:0,  nombre:'paraíso'}
   ],
   arcoA: 7.5        // semianchura libre de la boca escénica
 };
@@ -357,6 +360,29 @@ var FRENTE_ESCENICO={zInicioPalcos:-1.0,avanceAlas:1.5};
 FRENTE_ESCENICO.retiro=FRENTE_ESCENICO.avanceAlas-FRENTE_ESCENICO.zInicioPalcos;
 var ESCENARIO={altura:1.05,mitadX:9,zFondo:-16-FRENTE_ESCENICO.retiro,
   zFrente:FRENTE_ESCENICO.zInicioPalcos,curvatura:0.65};
+/* Vestíbulo posterior de los palcos frontales. Aprovecha el espacio de
+   servicio y comunica con las tablas por detrás de la embocadura. */
+var ACCESO_PALCO_FRONTAL={
+  xPalcoFrente:9.0,xPalcoMax:11.48,curvaPalco:0.42,
+  zPalcoMin:-0.98,zPalcoMax:1.82,
+  xCorredorMin:11.45,xCorredorMax:15.30,
+  zCorredorMin:-4.0,zCorredorMax:1.80,puertaZ:0.62,
+  xEnlaceMin:8.80,zEnlaceMax:-1.50,
+  pasoMin:11.60,pasoMax:13.10,
+  altura:ESCENARIO.altura+0.10
+};
+function alturaAccesoPalcoFrontal(x,z){
+  var a=ACCESO_PALCO_FRONTAL,ax=Math.abs(x);
+  var t=Math.max(0,Math.min(1,(z-a.zPalcoMin)/(a.zPalcoMax-a.zPalcoMin)));
+  var xFrente=a.xPalcoFrente-a.curvaPalco*Math.sin(Math.PI*t);
+  var enPalco=ax>=xFrente+0.02 && ax<=a.xPalcoMax &&
+    z>=a.zPalcoMin && z<=a.zPalcoMax;
+  var enCorredor=ax>=a.xCorredorMin && ax<=a.xCorredorMax &&
+    z>=a.zCorredorMin && z<=a.zCorredorMax;
+  var enEnlace=ax>=a.xEnlaceMin && ax<a.xCorredorMin &&
+    z>=a.zCorredorMin && z<=a.zEnlaceMax;
+  return enPalco||enCorredor||enEnlace?a.altura:null;
+}
 var FOSO={altura:-0.90,zVallaCentro:1.65,altoValla:0.85,grosorValla:0.10,
   escaleras:{xBajo:6.12,xAlto:7.80,xExterior:9,zCentro:0.25,ancho:1.0,zEntrada:1.80,peldanos:6}};
 function frenteEscenario(x){
@@ -421,6 +447,8 @@ FALLA.geo = {
   // caja del suelo del escenario (ver geometria.js: escenario()) — la usa el modo paseo para pisar las tablas
   frenteEscenico:FRENTE_ESCENICO,
   escenario:ESCENARIO,
+  accesoPalcoFrontal:ACCESO_PALCO_FRONTAL,
+  alturaAccesoPalcoFrontal:alturaAccesoPalcoFrontal,
   foso:FOSO,
   frenteEscenario:frenteEscenario,
   frenteFoso:frenteFoso,

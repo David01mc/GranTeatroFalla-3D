@@ -57,7 +57,40 @@ var ASIENTO_PASO = 0.60;     // separación entre butacas de una misma fila (m)
 var FILA_PASO    = 1.00;     // separación entre filas (m)
 var PASILLO_CENTRAL = 1.4;   // ancho de los dos pasillos entre el bloque central y los laterales
 var PASILLO_LATERAL = 1.2;   // ancho de los dos pasillos junto a los muros
+/* Altura de la valla calada, común a platea, principal y al graderío del
+   paraíso. Es una cota propia y no `piso.alto`: ese parámetro gobierna
+   además el hueco del palco, su tapa y el arranque de los separadores, y
+   aquí sólo se quiere la barandilla. 0,713 sale del tramo recto del
+   separador, que es donde la valla apoya sin sobresalir.
+
+   Vive en el módulo, no dentro de construir(): anfiteatroSegundo() la
+   necesita y como local reventaba con un ReferenceError al construir. */
+var ALTURA_BARANDILLA = Math.max(0.68, P.pisos[0].alto*0.62);
+
 var Z_FILA1 = 3.8;           // profundidad (z) de la fila 1, la más cercana al escenario
+
+/* ---- SEGUNDO PISO: PALCOS Y ANFITEATRO ------------------------------
+   Seis palcos por ala ocupan el arco delantero, el más cercano al
+   escenario; el trasero entero queda para el anfiteatro. El graderío se
+   extiende hacia fuera hasta ANFI_FUERA, comiéndose lo que en los otros
+   pisos es corredor: en los 2,70 m de banda del segundo no caben cuatro
+   filas, y con el corredor absorbido sí, sin apretarlas. */
+var NIVEL_ANFI = 2;
+var PALCOS_ANFI = 6, FRENTE_PALCO_ANFI = 2.50;   // 2,50 ≈ los 2,49 del principal
+var ANFI_FILAS = 4, ANFI_PASO = 0.80, ANFI_ALZADA = 0.25;
+var ANFI_TRAS_VALLA = 0.60;   // de la valla al frente de la primera fila
+var ANFI_PASILLO = 1.20;      // los dos pasillos que parten las filas 1 a 3
+var ANFI_FUERA = -2.60;       // retranqueo exterior: deja 1,50 m de pasillo alto
+
+/* Primer índice de `pts` cuyo recorrido desde `desde` supera `largo`. */
+function indiceTrasArco(pts, desde, largo){
+  var L=0, i=desde;
+  while(i+1<pts.length && L<largo){
+    L+=Math.hypot(pts[i+1].x-pts[i].x, pts[i+1].z-pts[i].z);
+    i++;
+  }
+  return i;
+}
 
 var FILAS_CENTRO = 21, ASIENTOS_CENTRO = 9;
 var FILAS_LATERAL = 20;
@@ -315,6 +348,8 @@ function pasillosPatio(){
   return g;
 }
 
+function butacasPiezas(){ butacas(); }
+
 function butacas(){
   var sitios = sitiosCentro().concat(sitiosLateral(-1), sitiosLateral(1));
   nButacas = sitios.length;
@@ -345,7 +380,7 @@ function butacas(){
   // Las piezas conservan materiales compartidos, pero reciben una
   // variación mínima y determinista por asiento para que las filas no
   // repitan exactamente el mismo color y silueta.
-  var piezas=[
+  var piezas=piezasButacaCache=[
     {g:geoRespaldoMadera, m:MAT.maderaButacaPatio},
     {g:geoRespaldo,       m:MAT.tapizadoButacaPatio},
     {g:geoCojin,          m:MAT.tapizadoButacaPatio},
@@ -356,6 +391,16 @@ function butacas(){
     {g:geoFileteD,        m:MAT.maderaButacaPatio}
   ];
 
+  return instanciaButacas(sitios, piezas);
+}
+
+/* Coloca una tanda de butacas del patio. Cada sitio es {x,z} y puede
+   traer además `y` y `rot`: el patio los omite —su cota sale del rasante
+   y todas miran al escenario—, pero el anfiteatro del paraíso las
+   necesita, porque va en cuesta y sus filas siguen la curva del anillo.
+   Comparte las mismas geometrías e instancias que el patio, de modo que
+   sumar el graderío no añade ni una malla más por butaca. */
+function instanciaButacas(sitios, piezas){
   var grupo=new THREE.Group(), m4=new THREE.Matrix4(), q=new THREE.Quaternion(),
       ejeY=new THREE.Vector3(0,1,0), pos3=new THREE.Vector3(), esc=new THREE.Vector3(),
       colorInstancia=new THREE.Color();
@@ -366,8 +411,8 @@ function butacas(){
       var s=sitios[i];
       var semilla=(i*37+Math.round((s.x+20)*17)+Math.round(s.z*13))%17;
       var variacion=(semilla-8)/8;
-      pos3.set(s.x, geo.rake(s.z), s.z);
-      q.setFromAxisAngle(ejeY,variacion*0.008);
+      pos3.set(s.x, s.y===undefined?geo.rake(s.z):s.y, s.z);
+      q.setFromAxisAngle(ejeY,(s.rot||0)+variacion*0.008);
       esc.set(1+variacion*0.008,1+variacion*0.006,1+variacion*0.004);
       m4.compose(pos3,q,esc);
       im.setMatrixAt(i,m4);
@@ -381,6 +426,14 @@ function butacas(){
   });
 
   return grupo;
+}
+
+/* Devuelve las piezas de una butaca del patio, para poder instanciarlas
+   desde otra tanda sin reconstruir sus geometrías. Se calcula una vez. */
+var piezasButacaCache=null;
+function piezasButacaPatio(){
+  if(!piezasButacaCache){ butacasPiezas(); }
+  return piezasButacaCache;
 }
 
 /* ---------------- EMBOCADURA REAL DEL FALLA -----------------------
@@ -445,6 +498,17 @@ function embocadura(){
       {x:s*(P.jamba+1.0),z:avance}];
     for(var k=0;k<puntos.length-1;k++){
       var a=puntos[k],b=puntos[k+1],dx=b.x-a.x,dz=b.z-a.z;
+      if(k===1){
+        // Paso real entre la zona de servicio y el vestíbulo trasero.
+        var acceso=geo.accesoPalcoFrontal,techoPaso=acceso.altura+2.25;
+        [[xEncuentro,acceso.pasoMin,0,P.altura],
+         [acceso.pasoMax,P.jamba+1.0,0,P.altura],
+         [acceso.pasoMin,acceso.pasoMax,techoPaso,P.altura]].forEach(function(r){
+          var paño=new THREE.Mesh(new THREE.BoxGeometry(r[1]-r[0],r[3]-r[2],0.7),MAT.muro);
+          paño.position.set(s*(r[0]+r[1])/2,(r[2]+r[3])/2,avance);g.add(paño);
+        });
+        continue;
+      }
       var ala=new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(dx,dz),P.altura,0.7),MAT.muro);
       ala.position.set((a.x+b.x)/2,P.altura/2,(a.z+b.z)/2);
       ala.rotation.y=-Math.atan2(dz,dx);
@@ -1460,6 +1524,24 @@ function apliquesEntresuelo(escena,borde,plan,ini,fin,nCeldas,yCentro){
 var puertasPalco=[];
 var murosPuertasPasillo=[];
 var murosExterioresPasillo=[];
+function puertaFrontalPlatea(escena,x,zCentro,y,signo){
+  var ancho=0.84,alto=1.99,angulo=-Math.PI/2;
+  var materiales=[MAT.zocaloPasillo,MAT.zocaloPasillo,MAT.zocaloPasillo,
+                  MAT.zocaloPasillo,MAT.puertaPalco,MAT.puertaPalco];
+  var pivote=new THREE.Group();
+  pivote.position.set(x,y,zCentro-ancho/2);
+  pivote.rotation.y=angulo;
+  var hoja=new THREE.Mesh(new THREE.BoxGeometry(ancho,alto,0.07),materiales);
+  hoja.position.set(ancho/2,alto/2,0);pivote.add(hoja);escena.add(pivote);
+  puertasPalco.push({pivote:pivote,x:x,y:y,z:zCentro,tx:0,tz:1,angulo:angulo,
+    nivel:0,sentido:-signo,apertura:0,objetivo:0});
+  [-1,1].forEach(function(lado){
+    var jamba=new THREE.Mesh(new THREE.BoxGeometry(0.12,2.05,0.09),MAT.zocaloPasillo);
+    jamba.position.set(x,y+1.025,zCentro+lado*0.46);escena.add(jamba);
+  });
+  var dintel=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.18,1.01),MAT.zocaloPasillo);
+  dintel.position.set(x,y+2.06,zCentro);escena.add(dintel);
+}
 function puertaCercana(x,z,dist,y){
   var mejor=null,dMejor=dist===undefined?1.65:dist;
   puertasPalco.forEach(function(p){
@@ -2149,23 +2231,80 @@ function palcosFrontales(escena, alturaFrontal, alturaBarandilla, altoPiso, sill
     var altoCierre=esPlatea?P.pisos[1].y-alturaFrontal:altoPiso+1.5;
     var grosorCierre=0.08;
     var centroCierreX=(xFondo+xFrente)/2;
-    var cierre=new THREE.Mesh(new THREE.BoxGeometry(ANCHO_FRONTAL,altoCierre,grosorCierre),MAT.yeso);
-    cierre.position.set(centroCierreX,alturaFrontal+altoCierre/2,Z_CORREDOR_INI);
-    escena.add(cierre);
+    if(esPlatea){
+      var acceso=geo.accesoPalcoFrontal;
+      var xMin=Math.min(xFondo,xFrente),xMax=Math.max(xFondo,xFrente);
+      var cierreFondo=new THREE.Mesh(
+        new THREE.BoxGeometry(xMax-xMin,altoCierre,grosorCierre),MAT.paredPasillo);
+      cierreFondo.position.set((xMin+xMax)/2,alturaFrontal+altoCierre/2,Z_CORREDOR_INI);
+      escena.add(cierreFondo);
+
+      // La puerta se abre en el trasdós exterior (x = xFondo), orientada
+      // hacia el corredor posterior que se ve desde las cajas escénicas.
+      var zPuerta=acceso.puertaZ,medioPuerta=0.42;
+      function pañoTrasero(z0,z1,y0,alto){
+        if(z1-z0<0.01)return;
+        var paño=new THREE.Mesh(
+          new THREE.BoxGeometry(grosorCierre,alto,z1-z0),MAT.paredPasillo);
+        paño.position.set(xFondo,y0+alto/2,(z0+z1)/2);escena.add(paño);
+      }
+      pañoTrasero(zInicio,zPuerta-medioPuerta,alturaFrontal,altoCierre);
+      pañoTrasero(zPuerta+medioPuerta,Z_CORREDOR_INI,alturaFrontal,altoCierre);
+      pañoTrasero(zPuerta-medioPuerta,zPuerta+medioPuerta,alturaFrontal+1.99,
+        altoCierre-1.99);
+      puertaFrontalPlatea(escena,xFondo,zPuerta,alturaFrontal,signo);
+      murosPuertasPasillo.push({linea:[{x:xFondo,z:zInicio},{x:xFondo,z:Z_CORREDOR_INI}],
+        y:alturaFrontal,nivel:0});
+
+      // El testero del fondo queda cerrado; el único acceso es la puerta
+      // del trasdós. Frente y testero conservan sus límites físicos.
+      escena.add(cinta([bF[0],plF[0]],yFrontal,function(){return yTecho;},MAT.paredPasillo));
+      murosExterioresPasillo.push({linea:bF,y:alturaFrontal,nivel:0});
+      murosExterioresPasillo.push({linea:[bF[0],plF[0]],y:alturaFrontal,nivel:0});
+      murosExterioresPasillo.push({linea:[{x:xMin,z:Z_CORREDOR_INI},{x:xMax,z:Z_CORREDOR_INI}],
+        y:alturaFrontal,nivel:0});
+
+      // Vestíbulo amplio en el espacio sin construir detrás del palco.
+      // Entra desde las tablas por la zona de servicio, a la misma cota.
+      var anchoR=acceso.xCorredorMax-acceso.xCorredorMin;
+      var fondoR=acceso.zCorredorMax-acceso.zCorredorMin;
+      var sueloR=new THREE.Mesh(new THREE.BoxGeometry(anchoR,0.14,fondoR),MAT.sueloPasillo);
+      sueloR.position.set(signo*(acceso.xCorredorMin+acceso.xCorredorMax)/2,
+        alturaFrontal-0.07,(acceso.zCorredorMin+acceso.zCorredorMax)/2);escena.add(sueloR);
+      var xi=signo*acceso.xCorredorMin,xe=signo*acceso.xCorredorMax;
+      var enlace=new THREE.Mesh(new THREE.BoxGeometry(
+        acceso.xCorredorMin-acceso.xEnlaceMin,0.14,
+        acceso.zEnlaceMax-acceso.zCorredorMin),MAT.sueloPasillo);
+      enlace.position.set(signo*(acceso.xCorredorMin+acceso.xEnlaceMin)/2,
+        alturaFrontal-0.07,(acceso.zEnlaceMax+acceso.zCorredorMin)/2);escena.add(enlace);
+      var tapa=new THREE.Mesh(new THREE.BoxGeometry(anchoR,0.12,fondoR),MAT.techoPalco);
+      tapa.position.set(sueloR.position.x,yTecho-0.06,sueloR.position.z);escena.add(tapa);
+      var bordesR=[
+        [{x:xe,z:acceso.zCorredorMin},{x:xe,z:acceso.zCorredorMax}],
+        [{x:signo*acceso.xEnlaceMin,z:acceso.zCorredorMin},{x:xe,z:acceso.zCorredorMin}],
+        [{x:xFondo,z:acceso.zCorredorMax},{x:xe,z:acceso.zCorredorMax}],
+        [{x:signo*acceso.xEnlaceMin,z:acceso.zEnlaceMax},{x:xi,z:acceso.zEnlaceMax}],
+        [{x:xi,z:acceso.zEnlaceMax},{x:xi,z:zInicio}]
+      ];
+      bordesR.forEach(function(linea){
+        escena.add(cinta(linea,alturaFrontal-0.14,alturaFrontal+0.32,MAT.zocaloPasillo));
+        escena.add(cinta(linea,alturaFrontal+0.32,yTecho,MAT.paredPasillo));
+        murosExterioresPasillo.push({linea:linea,y:alturaFrontal,nivel:0});
+      });
+    }else{
+      var cierre=new THREE.Mesh(new THREE.BoxGeometry(ANCHO_FRONTAL,altoCierre,grosorCierre),MAT.yeso);
+      cierre.position.set(centroCierreX,alturaFrontal+altoCierre/2,Z_CORREDOR_INI);
+      escena.add(cierre);
+    }
     // Composición histórica en la cara que mira hacia las mamparas de
     // tres arcos: panel cuadrado abajo y friso horizontal arriba.
     var ladoPanel=Math.min(ANCHO_FRONTAL-0.34,altoCierre-0.24);
     var zPanel=Z_CORREDOR_INI+grosorCierre/2+0.006;
-    var panel=new THREE.Mesh(new THREE.PlaneGeometry(ladoPanel,ladoPanel),MAT.panelPalcoFrontal);
-    panel.name='panelMudejarPalcoFrontal';
-    panel.position.set(centroCierreX,alturaFrontal+0.12+ladoPanel/2,zPanel);
-    escena.add(panel);
-    if(esPlatea){
-      var altoFriso=0.58;
-      var friso=new THREE.Mesh(new THREE.PlaneGeometry(ladoPanel,altoFriso),MAT.frisoPalcoFrontal);
-      friso.name='frisoMudejarPalcoFrontal';
-      friso.position.set(centroCierreX,alturaFrontal+0.12+ladoPanel+0.09+altoFriso/2,zPanel);
-      escena.add(friso);
+    if(!esPlatea){
+      var panel=new THREE.Mesh(new THREE.PlaneGeometry(ladoPanel,ladoPanel),MAT.panelPalcoFrontal);
+      panel.name='panelMudejarPalcoFrontal';
+      panel.position.set(centroCierreX,alturaFrontal+0.12+ladoPanel/2,zPanel);
+      escena.add(panel);
     }
   });
 }
@@ -2310,8 +2449,85 @@ function fusionaEstaticas(escena){
 }
 
 /* ---------------- MONTAJE ----------------------------------------- */
+/* Anfiteatro del segundo piso: cuatro filas en cuesta sobre el arco trasero.
+   La fila 4, la de arriba, da la vuelta entera; las tres de delante se
+   parten en tres zonas con dos pasillos, igual que pasillosPatio() hace
+   en el patio. Cada fila es un peldaño con su tapa y su tabica, y las
+   butacas son las mismas instancias que las del patio —no una geometría
+   nueva—, apoyadas en la cota de su fila y giradas para mirar al
+   escenario siguiendo la curva del anillo. */
+function anfiteatroSegundo(escena){
+  var piso=P.pisos[NIVEL_ANFI], plan=geo.PLAN, n=plan.length;
+  var grupo=new THREE.Group(); grupo.name='anfiteatroSegundo';
+  // El graderío arranca donde acaban los seis palcos de cada ala.
+  var iIni=indiceTrasArco(geo.dentro(plan,piso.dentro),0,
+    PALCOS_ANFI*FRENTE_PALCO_ANFI);
+  var iFin=n-1-iIni;
+  var sitios=[];
+
+  for(var r=0;r<ANFI_FILAS;r++){
+    var dFrente=piso.dentro-ANFI_TRAS_VALLA-r*ANFI_PASO;
+    var dFondo=dFrente-ANFI_PASO;
+    var y=piso.y+r*ANFI_ALZADA;
+    var cFrente=geo.dentro(plan,dFrente).slice(iIni,iFin+1);
+    var cFondo =geo.dentro(plan,dFondo ).slice(iIni,iFin+1);
+    /* La primera fila va al nivel del propio piso, así que no lleva
+       peldaño: su tapa saldría coplanar con el suelo del anillo y su
+       tabica colgaría 25 cm por debajo del forjado, sobre el vacío, que
+       es lo que se veía como una banda parda detrás de la barandilla. */
+    if(r>0){
+      grupo.add(banda(cFrente,cFondo,y,y,MAT.suelo));                   // tapa
+      grupo.add(cinta(cFrente,y-ANFI_ALZADA,y,MAT.maderaPlatea));       // tabica
+    }
+
+    // Eje de la fila: por ahí van los respaldos.
+    var eje=geo.dentro(plan,(dFrente+dFondo)/2).slice(iIni,iFin+1);
+    var largo=0,k;
+    for(k=0;k<eje.length-1;k++) largo+=Math.hypot(eje[k+1].x-eje[k].x,eje[k+1].z-eje[k].z);
+    // Dos pasillos a un tercio y dos tercios del recorrido. La última
+    // fila —la de arriba— no se parte: es la que da la vuelta entera.
+    var parte = r<ANFI_FILAS-1;
+    var huecos = parte ? [largo/3, 2*largo/3] : [];
+
+    var recorrido=0, siguiente=ASIENTO_PASO/2;
+    for(k=0;k<eje.length-1;k++){
+      var a=eje[k], b=eje[k+1];
+      var tramo=Math.hypot(b.x-a.x,b.z-a.z);
+      while(siguiente<=recorrido+tramo){
+        var t=(siguiente-recorrido)/(tramo||1);
+        var enPasillo=huecos.some(function(h){return Math.abs(siguiente-h)<ANFI_PASILLO/2;});
+        if(!enPasillo){
+          var px=a.x+(b.x-a.x)*t, pz=a.z+(b.z-a.z)*t;
+          // Hacia dentro: del fondo de la fila hacia su frente.
+          var fx=cFrente[k].x-cFondo[k].x, fz=cFrente[k].z-cFondo[k].z;
+          var fl=Math.hypot(fx,fz)||1;
+          sitios.push({x:px, y:y, z:pz, rot:Math.atan2(-fx/fl,-fz/fl)});
+        }
+        siguiente+=ASIENTO_PASO;
+      }
+      recorrido+=tramo;
+    }
+  }
+
+  /* El graderío no pone valla propia: la del anillo ya recorre su mismo
+     borde. Antes la ponía 60 cm por dentro —en el frente de la primera
+     fila, no en el canto— y quedaban dos barandillas paralelas. */
+  var dUltima=piso.dentro-ANFI_TRAS_VALLA-ANFI_FILAS*ANFI_PASO;
+  var yAlto=piso.y+(ANFI_FILAS-1)*ANFI_ALZADA;
+  grupo.add(banda(geo.dentro(plan,dUltima).slice(iIni,iFin+1),
+                  geo.dentro(plan,ANFI_FUERA).slice(iIni,iFin+1),
+                  yAlto,yAlto,MAT.sueloPasillo));
+
+  escena.add(grupo);
+  escena.add(instanciaButacas(sitios, piezasButacaPatio()));
+  return sitios.length;
+}
+
 function construir(escena){
   HITBOXES_MAMPARAS.length=0;
+  puertasPalco.length=0;
+  murosPuertasPasillo.length=0;
+  murosExterioresPasillo.length=0;
   escena.background=new THREE.Color(0x0d0608);
   escena.fog=new THREE.Fog(0x0d0608, 34, 78);
 
@@ -2323,11 +2539,13 @@ function construir(escena){
   // siguiente: sus portadas y el cerramiento retrasado del pasillo son
   // quienes delimitan ahora los palcos, no el antiguo muro burdeos.
   escena.add(cinta(geo.PLAN, function(p){return geo.rake(p.z);}, function(p){
+    if(p.z<=geo.accesoPalcoFrontal.zCorredorMax)return geo.accesoPalcoFrontal.altura;
     // Desde el final del palco frontal se rebaja el muro hasta el suelo
     // de platea para abrir la salida hacia el corredor.
     return p.z>=Z_CORREDOR_INI-0.8 ? geo.platea.altura : P.altura;
   }, MAT.muro));
   escena.add(cinta(geo.PLAN, function(p){
+    if(p.z<=geo.accesoPalcoFrontal.zCorredorMax)return P.pisos[1].y;
     return p.z>=Z_CORREDOR_INI-0.8 ? P.pisos[2].y : P.altura;
   }, P.altura, MAT.muro));
 
@@ -2344,9 +2562,9 @@ function construir(escena){
   //    (se dejará listo para puerta/pasillo más adelante).
   //  - El ala de la platea en sí: los 9 palcos por lado sobre la peana
   //    normal, empezando ya pasado el Antepalco.
-  var ALTURA_FRONTAL = geo.escenario.altura + 0.10; // suelo del palco junto al escenario: un poco por encima de las tablas
+  var ALTURA_FRONTAL = geo.accesoPalcoFrontal.altura;
   var ELEVACION_PLATEA = 0.40;                      // peana normal del resto del ala
-  var ALTURA_BARANDILLA_PLATEA = Math.max(0.68, P.pisos[0].alto*0.62); // coincide con el tramo recto de los separadores
+
   // La platea inferior es horizontal: se toma como cota única el punto
   // más alto que antes alcanzaba al seguir la pendiente de la sala. Así
   // se elevan los tramos delanteros sin bajar los del fondo.
@@ -2401,7 +2619,7 @@ function construir(escena){
 
       if(!sillaPalcoGeo) sillaPalcoGeo = construirSillaPalco();
 
-      palcosFrontales(escena, ALTURA_FRONTAL, ALTURA_BARANDILLA_PLATEA, piso.alto, sillaPalcoGeo,
+      palcosFrontales(escena, ALTURA_FRONTAL, ALTURA_BARANDILLA, piso.alto, sillaPalcoGeo,
         function(p){return geo.rake(p.z);});
 
       // El ala en sí (peana+barandilla+suelo+moldura continuos, y dentro,
@@ -2429,7 +2647,7 @@ function construir(escena){
         var geoRemate=new THREE.TubeGeometry(curvaRemate,Math.max(12,tramoBar.length*2),0.075,10,false);
         escena.add(new THREE.Mesh(geoRemate,MAT.barnizClaro));
       });
-      barandillaPlateaConSalidas(escena, bAla, yPiso, ALTURA_BARANDILLA_PLATEA);
+      barandillaPlateaConSalidas(escena, bAla, yPiso, ALTURA_BARANDILLA);
       // Trasdós: misma forma que la herradura pero más retranqueado (más
       // cerca del muro real), para que el ala tenga volumen real y no
       // sea una peana de espesor cero. De momento sin textura.
@@ -2544,17 +2762,24 @@ function construir(escena){
            Su suelo se solaparía con el del anillo, que pasa por debajo a la
            misma cota; 5 mm de separación evitan que las dos tapas peleen
            por el mismo plano, igual que en el cruce del pasillo EXIT. */
-        palcosFrontales(escena, piso.y+0.005, piso.alto, piso.alto, sillaPalcoGeo,
+        palcosFrontales(escena, piso.y+0.005, ALTURA_BARANDILLA, piso.alto, sillaPalcoGeo,
           yBajo-0.005);
       }
-      if(n===1)barandillaPalco(escena,bordeAnillo,yPiso,piso.alto);
-      else escena.add(cinta(borde, yPiso, yTop, MAT.antepecho));            // antepecho
-      // En el principal no se coloca la antigua tapa horizontal oscura:
-      // sus portadas arqueadas cierran visualmente cada palco sin formar
-      // una gran cara negra al mirar el nivel desde fuera.
-      if(n!==1)escena.add(banda(borde,planPiso,yTop,yTop,MAT.techoPalco)); // techo del palco
+      /* Todos los niveles llevan la misma valla calada. El segundo y el
+         paraíso tenían en su lugar un antepecho macizo de granate rematado
+         por una moldura de oro: vistos desde el patio se leían como dos
+         grandes cintas rojas que tapaban la barandilla en vez de
+         dibujarla, y encima eran los únicos sin celosía de la sala. */
+      barandillaPalco(escena, n===1?bordeAnillo:borde, yPiso, ALTURA_BARANDILLA);
+      /* Ningún nivel lleva ya la antigua tapa horizontal del palco. Iba a
+         yTop —suelo + `alto`—, que tenía sentido mientras el antepecho
+         macizo llegaba hasta ahí; con la celosía de 0,713 se quedaba
+         flotando casi medio metro por encima de la barandilla, y como usa
+         la textura del techo se leía como un techo suelto a media altura.
+         El principal ya la había perdido: sus portadas arqueadas cierran
+         cada palco sin formar una gran cara al mirar el nivel desde fuera,
+         y lo mismo vale para el segundo y el paraíso. */
       escena.add(banda(borde,planPiso,yPiso,yPiso,MAT.suelo));              // suelo del palco
-      if(n!==1)escena.add(cinta(borde, yTop, function(p){return yTop(p)+0.14;}, MAT.oro)); // moldura
       if(n===1){
         // Once palcos por lado. El tramo central posterior queda
         // reservado al palco de autoridades, no recibe separadores.
@@ -2584,34 +2809,46 @@ function construir(escena){
           yPiso,P.pisos[2].y,1);
         pasilloCurvoPalcos(escena,geo.PLAN,0,geo.PLAN.length-1,
           yPiso,P.pisos[2].y,1);
+      }else if(n===NIVEL_ANFI){
+        /* Segundo piso: seis palcos por ala en el arco delantero, el más
+           cercano al escenario. El arco trasero no lleva palcos —es del
+           anfiteatro, que construye anfiteatroSegundo()— y por eso todo
+           se acota a ese tramo y a su espejo, en vez de dar la vuelta
+           completa como en los pisos de abajo.
+
+           Corredor y antepalcos van sólo en ese mismo tramo: por detrás
+           el graderío ocupa lo que sería corredor y su pasillo alto hace
+           de distribuidor. Los arcos se atan a piso.y + 2,75 —la altura
+           libre del principal— y no al techo, que dejaría portadas de
+           tres metros y medio.
+
+           Hacen falta dos juegos de índices: uneContornoAPared() remuestrea
+           `borde` y `planPiso` para llevar la balconada hasta la pared, así
+           que sus índices ya no son los de geo.PLAN, que es lo que usan el
+           corredor y los antepalcos. */
+        var largoPalcos=PALCOS_ANFI*FRENTE_PALCO_ANFI;
+        var iFinPalcos=indiceTrasArco(borde,0,largoPalcos);
+        var iFinPalcosI=borde.length-1-iFinPalcos;
+        var iPlanFin=indiceTrasArco(geo.dentro(geo.PLAN,piso.dentro),0,largoPalcos);
+        var iPlanFinI=geo.PLAN.length-1-iPlanFin;
+        var yTechoAnfi=piso.y+2.75;
+        [[0,iFinPalcos],[iFinPalcosI,borde.length-1]].forEach(function(t){
+          separadoresPalco(escena,borde,planPiso,t[0],t[1],PALCOS_ANFI,piso.y,piso.alto);
+          sillasPalco(escena,borde,planPiso,t[0],t[1],PALCOS_ANFI,yPiso,sillaPalcoGeo);
+          portadasPalcosPlatea(escena,borde,planPiso,t[0],t[1],PALCOS_ANFI,yPiso,yTechoAnfi);
+        });
+        [[0,iPlanFin],[iPlanFinI,geo.PLAN.length-1]].forEach(function(t){
+          antepalcosPlatea(escena,geo.PLAN,t[0],t[1],PALCOS_ANFI,yPiso,yTechoAnfi,NIVEL_ANFI);
+          pasilloCurvoPalcos(escena,geo.PLAN,t[0],t[1],yPiso,yTechoAnfi,NIVEL_ANFI);
+        });
       }else if(piso.palcos){
         separadoresPalco(escena,borde,planPiso,0,borde.length-1,piso.palcos,piso.y,piso.alto);
-        if(n===2){
-          /* Circulación del segundo piso. Su anillo estaba construido
-             pero era inalcanzable: ni escalera, ni corredor, ni puertas.
-             Sus palcos frontales son la prolongación del propio anillo
-             hasta la pared (ver uneContornoAPared más arriba), así que en
-             cuanto hay corredor y antepalco se llega a ellos caminando
-             por la balconada, sin pasaje aparte. Se le da el mismo par
-             que ya tiene el principal, a la cota de este piso. */
-          var celdasSegundo=Math.max(1,Math.round(piso.palcos/2));
-          var iCentroSegundo=0;
-          for(var ic2=0;ic2<geo.PLAN.length;ic2++){
-            if(geo.PLAN[ic2].x<=4.4){ iCentroSegundo=ic2; break; }
-          }
-          var iCentroSegundoI=geo.PLAN.length-1-iCentroSegundo;
-          antepalcosPlatea(escena,geo.PLAN,0,iCentroSegundo,celdasSegundo,
-            yPiso,P.pisos[3].y,2);
-          antepalcosPlatea(escena,geo.PLAN,iCentroSegundoI,geo.PLAN.length-1,celdasSegundo,
-            yPiso,P.pisos[3].y,2);
-          pasilloCurvoPalcos(escena,geo.PLAN,0,geo.PLAN.length-1,
-            yPiso,P.pisos[3].y,2);
-        }
       }
     }
   });
 
   escena.add(butacas());
+  nButacas += anfiteatroSegundo(escena);
   escena.add(pasillosPatio());
   fondoTecnicoPlatea(escena);
   escena.add(embocadura());
