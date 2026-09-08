@@ -22,6 +22,9 @@ texAlfombraEscalera.center.set(0.5,0.5);
 texAlfombraEscalera.rotation=Math.PI/2;
 texAlfombraEscalera.needsUpdate=true;
 var texTelon        = textura('Textures/Telon.webp', 1, 1);     // ídem: el UV de la cortina ya mete su propio repetido
+var texTechoPalcos  = textura('Textures/TechoPalcosGenerado.png',1,1);
+var texEstucoPilastra=textura('Textures/EstucoPilastraGenerado.png',1,1);
+var texPiedraPilastra=textura('Textures/PiedraPilastraGenerada.png',1,1);
 var texMaderaButaca = textura('Textures/MaderaButaca.webp', 1, 1);
 var texMaderaBlanca = textura('Textures/MaderaBlanca.webp', 1, 1);
 var texMaderaPlatea = textura('Textures/MaderaPlateaInferior.webp', 1, 1);
@@ -49,9 +52,18 @@ var texBronceAplique= textura('Textures/BronceApliqueEnvejecido.webp', 2, 2);
 // recorrer millones de píxeles durante el arranque.
 var matTerciopeloButaca = new THREE.MeshLambertMaterial({map:texTerciopelo,color:new THREE.Color(0.90,1,1)});
 
+// Imágenes generadas para el patio: terciopelo suave y nogal mate.
+var texNogalPatio=textura('Textures/NogalButacaPatioGenerado.png',1,1);
+var texTejidoPatio=textura('Textures/TerciopeloButacaPatioGenerado.png',1,1);
+
 var MAT = {
+  estucoPilastra:new THREE.MeshLambertMaterial({map:texEstucoPilastra,color:0xe1d4b6}),
+  piedraPilastra:new THREE.MeshLambertMaterial({map:texPiedraPilastra,color:0xc4c4c4}),
   terciopeloButaca: matTerciopeloButaca,
   maderaButaca:     new THREE.MeshLambertMaterial({map:texMaderaButaca}),
+  // Acabado mate, acorde con la carpintería envejecida de la sala.
+  maderaButacaPatio:new THREE.MeshLambertMaterial({map:texNogalPatio}),
+  tapizadoButacaPatio:new THREE.MeshLambertMaterial({map:texTejidoPatio}),
   // Tinte ligeramente gris para conservar la veta sin quemarla bajo los
   // numerosos focos cálidos de los palcos.
   maderaBlanca:     new THREE.MeshLambertMaterial({map:texMaderaBlanca, color:0xb0a99b, side:THREE.DoubleSide}),
@@ -105,8 +117,13 @@ var MAT = {
   entresueloFrente:new THREE.MeshLambertMaterial({map:texEntresuelo,
                     color:0xc8bda9, side:THREE.DoubleSide}),
   hueco:      new THREE.MeshLambertMaterial({color:0x140a0c, side:THREE.DoubleSide}),
+  techoPalco: new THREE.MeshLambertMaterial({map:texTechoPalcos,
+                color:0xb59b83, side:THREE.DoubleSide}),
   tablas:     new THREE.MeshLambertMaterial({color:0x5b3a24}),
   sueloEscenario:new THREE.MeshLambertMaterial({map:texSueloEscenario, color:0xc5c5c5}),
+  cortinaPalco:new THREE.MeshLambertMaterial({map:texTelon, color:0x74303c,
+                 vertexColors:true, side:THREE.DoubleSide}),
+  alzapanoPalco:new THREE.MeshLambertMaterial({color:0xc5a574, side:THREE.DoubleSide}),
   telon:      new THREE.MeshLambertMaterial({map:texTelon, side:THREE.DoubleSide})
 };
 

@@ -46,13 +46,114 @@ function cortina(perfil, yb, yt, mat, repV){
    los mantiene cuadrados entre sí. */
 var FONDO_MAMPARA = 0.09;
 
+/* Carpintería inspirada en la mampara histórica: coronación curva,
+   sobreluces polilobuladas y cuarterones con diagonales en ambas caras.
+   Se usa completa en los laterales y por módulos en los pasillos. */
+function construirMamparaReferencia(ancho,alto,nVanos,pasoLibre){
+  var grupo=new THREE.Group(), fondo=FONDO_MAMPARA;
+  nVanos=nVanos||3;
+  // Comparte exactamente el acabado de los separadores entre palcos.
+  var madera=MAT.maderaBlanca;
+  var filete=MAT.maderaBlanca.clone(); filete.color.setHex(0xe2c18d);
+  var sombra=new THREE.MeshLambertMaterial({color:0x806344});
+  var margen=ancho*0.065, montante=ancho*0.060;
+  // El zócalo alcanza la altura del antepecho contiguo para que no quede
+  // una rendija visual bajo los paños acristalados.
+  var luz=(ancho-2*margen-(nVanos-1)*montante)/nVanos, base=alto*0.38;
+  var forma=new THREE.Shape();
+  forma.moveTo(-ancho/2,0); forma.lineTo(ancho/2,0);
+  forma.lineTo(ancho/2,alto*0.79);
+  forma.bezierCurveTo(ancho/2,alto*1.07,-ancho/2,alto*1.07,-ancho/2,alto*0.79);
+  forma.closePath();
+  function relieve(puntos,radio,material){
+    [1,-1].forEach(function(lado){
+      var curva=new THREE.CurvePath();
+      for(var k=1;k<puntos.length;k++) curva.add(new THREE.LineCurve3(
+        new THREE.Vector3(puntos[k-1].x,puntos[k-1].y,lado*(fondo/2+0.012)),
+        new THREE.Vector3(puntos[k].x,puntos[k].y,lado*(fondo/2+0.012))));
+      grupo.add(new THREE.Mesh(new THREE.TubeGeometry(curva,Math.max(8,puntos.length*2),radio,5,false),material));
+    });
+  }
+  function rectangulo(x0,y0,x1,y1){
+    var p=new THREE.Path(); p.moveTo(x0,y0); p.lineTo(x0,y1);
+    p.lineTo(x1,y1); p.lineTo(x1,y0); p.closePath(); return p;
+  }
+  for(var n=0;n<nVanos;n++){
+    var centro=(n-(nVanos-1)/2)*(luz+montante), iz=centro-luz/2, de=centro+luz/2;
+    var central=n===(nVanos-1)/2;
+    var arranque=alto*(central?0.715:0.695), clave=alto*(central?0.936:0.888);
+    var travesano=arranque-alto*0.032;
+    // Cada semicircunferencia desplaza el intradós hacia fuera: los
+    // lóbulos son huecos reales, y la moldura sigue el mismo contorno.
+    var arcoPts=[{x:iz,y:arranque}], lobulos=11;
+    for(var j=0;j<lobulos;j++){
+      var a0=Math.PI-j*Math.PI/lobulos, a1=Math.PI-(j+1)*Math.PI/lobulos;
+      var x0=centro+luz/2*Math.cos(a0), y0=arranque+(clave-arranque)*Math.sin(a0);
+      var x1=centro+luz/2*Math.cos(a1), y1=arranque+(clave-arranque)*Math.sin(a1);
+      var dx=x1-x0, dy=y1-y0;
+      for(var k=1;k<=8;k++){
+        var t=k/8, bulbo=Math.sin(Math.PI*t)*0.48;
+        arcoPts.push({x:x0+dx*t-dy*bulbo,y:y0+dy*t+dx*bulbo});
+      }
+    }
+    var arco=new THREE.Path();
+    if(pasoLibre){
+      // Un único hueco continuo desde el suelo hasta la clave: no queda
+      // zócalo ni travesaño atravesando la zona de paso.
+      arco.moveTo(iz,0);
+      arco.lineTo(iz,arranque);
+      for(var ap=1;ap<arcoPts.length;ap++) arco.lineTo(arcoPts[ap].x,arcoPts[ap].y);
+      arco.lineTo(de,0);
+    }else{
+      var inferior=rectangulo(iz,base,de,travesano);
+      forma.holes.push(inferior);
+      relieve(inferior.getPoints(),0.012,filete);
+      arco.moveTo(arcoPts[0].x,arcoPts[0].y);
+      for(var ap=1;ap<arcoPts.length;ap++) arco.lineTo(arcoPts[ap].x,arcoPts[ap].y);
+      arco.lineTo(de,arranque);
+    }
+    arco.closePath(); forma.holes.push(arco);
+    relieve(arco.getPoints(),0.018,filete);
+    if(!pasoLibre){
+      // Panel inferior rehundido, con marco y haces diagonales simétricos.
+      var panel=rectangulo(iz,alto*0.045,de,base-alto*0.025);
+      relieve(panel.getPoints(),0.014,filete);
+      var yb=alto*0.058, yt=base-alto*0.040, pad=luz*0.07;
+      for(var d=0;d<5;d++){
+        var yy=yb+(yt-yb)*d/5;
+        relieve([{x:iz+pad,y:yy},{x:de-pad,y:Math.min(yt,yy+(yt-yb)*0.50)}],0.006,filete);
+        relieve([{x:iz+pad,y:Math.min(yt,yy+(yt-yb)*0.50)},{x:de-pad,y:yy}],0.006,filete);
+      }
+    }
+  }
+  // Medallones florales entre las claves, tallados sobre la madera.
+  if(nVanos===3){
+    [-1,1].forEach(function(signo){
+      var cx=signo*(luz+montante)/2, cy=alto*0.91, r=Math.min(montante*0.65,alto*0.034);
+      var circulo=[];
+      for(var i=0;i<=40;i++){var a=i*Math.PI/20; circulo.push({x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)});}
+      relieve(circulo,0.009,filete);
+      var flor=[];
+      for(var i=0;i<=72;i++){var a=i*Math.PI/36, rr=r*(0.48+0.20*Math.cos(6*a)); flor.push({x:cx+rr*Math.cos(a),y:cy+rr*Math.sin(a)});}
+      relieve(flor,0.005,sombra);
+    });
+  }
+  var geometria=new THREE.ExtrudeGeometry(forma,{depth:fondo,curveSegments:20,
+    bevelEnabled:true,bevelThickness:0.006,bevelSize:0.006,bevelSegments:2});
+  geometria.translate(0,0,-fondo/2);
+  grupo.add(new THREE.Mesh(geometria,madera));
+  return grupo;
+}
+
 /* Mampara de arcos: parte inferior maciza, como en la referencia, y los
    vanos que se pidan, por los que se ve la sala. Se arma a la medida
    —el alto libre no es el mismo en el desembarco de las escaleras que
    bajo el forjado del piso principal—, centrada en el origen y de cara a
    +Z, lista para girarla sobre su radial. Las proporciones de arranque,
    clave y zócalo son las de la mampara original de 4.38 m. */
-function construirMamparaArcos(ancho,alto,nVanos){
+function construirMamparaArcos(ancho,alto,nVanos,pasoLibre){
+  if(!nVanos || nVanos===1 || nVanos===3)
+    return construirMamparaReferencia(ancho,alto,nVanos||3,pasoLibre);
   var grupo=new THREE.Group();
   var base=alto*0.370, altoArranque=alto*0.726, altoClave=alto*0.918;
   var margen=0.10, separacion=0.08;
@@ -135,6 +236,19 @@ function construirMamparaArcos(ancho,alto,nVanos){
    volutas alrededor de un óvalo central y calados lanceolados abajo.
    Los biseles escalonados hacen legibles las molduras concéntricas. */
 var cacheBalaustresOrnamentales={};
+/* Teselado del balaustre de la celosía. Es la pieza más repetida de la
+   sala —unas 440 copias instanciadas entre los cuatro niveles— así que
+   su recuento manda sobre el de la escena entera: con los valores de
+   antes (curva 10, bisel 2, filetes de 32x4) salía a 7808 triángulos,
+   o sea 3,4 de los 3,8 millones que se dibujaban al mirar el patio,
+   el 90 %.
+
+   Los filetes son tubos de 2,5 mm de radio: a la distancia desde la que
+   se ven, incluso desde el propio palco, no llegan a un par de píxeles,
+   de modo que bajar sus segmentos no cambia la imagen. La silueta y los
+   calados son lo que sí se lee, y ésos conservan curva suficiente. */
+var SEG_CURVA=6, SEG_BISEL=1, SEG_FILETE=10, LADOS_FILETE=3;
+
 function geometriaBalaustreOrnamental(alto){
   if(cacheBalaustresOrnamentales[alto])return cacheBalaustresOrnamentales[alto];
   var h=alto,w=0.34,s=new THREE.Shape();
@@ -193,7 +307,7 @@ function geometriaBalaustreOrnamental(alto){
   gotaInferior.absellipse(0,h*0.185,0.018,h*0.068,0,Math.PI*2,true);s.holes.push(gotaInferior);
   var cuerpo=new THREE.ExtrudeGeometry(s,{
     depth:0.038, bevelEnabled:true, bevelThickness:0.005,
-    bevelSize:0.003, bevelSegments:2,curveSegments:10
+    bevelSize:0.003, bevelSegments:SEG_BISEL, curveSegments:SEG_CURVA
   });
   cuerpo.translate(0,0,-0.019);
 
@@ -202,12 +316,12 @@ function geometriaBalaustreOrnamental(alto){
   // sin añadir un objeto por voluta ni por repetición de la valla.
   var partes=[cuerpo];
   s.holes.forEach(function(hueco){
-    var puntos=hueco.getSpacedPoints(32);
+    var puntos=hueco.getSpacedPoints(SEG_FILETE);
     [-1,1].forEach(function(cara){
       var curva=new THREE.CatmullRomCurve3(puntos.slice(0,-1).map(function(p){
         return new THREE.Vector3(p.x,p.y,cara*0.023);
       }),true,'centripetal');
-      partes.push(new THREE.TubeGeometry(curva,32,0.0025,4,true));
+      partes.push(new THREE.TubeGeometry(curva,SEG_FILETE,0.0025,LADOS_FILETE,true));
     });
   });
   var posiciones=[],normales=[],uvs=[];
@@ -235,16 +349,46 @@ function geometriaBalaustreOrnamental(alto){
 /* Cortina lateral recogida: paño ancho arriba, ceñido en el centro por
    el alzapaño y ligeramente abierto de nuevo en su caída inferior. */
 function geometriaCortinaPalco(ancho,alto,lado){
-  var s=new THREE.Shape(), xExt=lado*ancho/2, xInt=lado*ancho*0.13;
-  s.moveTo(xExt,alto*0.12);
-  s.lineTo(lado*ancho*0.36,alto*0.12);
-  s.lineTo(lado*ancho*0.31,alto*0.46);
-  s.lineTo(xInt,alto*0.94);
-  s.lineTo(xExt,alto*0.94);
-  s.lineTo(lado*ancho*0.42,alto*0.48);
-  s.closePath();
-  var g=new THREE.ExtrudeGeometry(s,{depth:0.045,bevelEnabled:true,bevelThickness:0.012,bevelSize:0.012,bevelSegments:1});
-  g.translate(0,0,-0.0225);
+  // Una superficie de tela: los pliegues convergen en la recogida y
+  // vuelven a abrirse hacia el suelo. El borde superior queda oculto
+  // detrás del arco, evitando el antiguo corte diagonal rígido.
+  var nx=48, ny=36, pos=[], uv=[], colores=[], indices=[];
+  for(var j=0;j<=ny;j++){
+    var v=j/ny, t, interior;
+    if(v<0.43){
+      t=v/0.43; t=t*t*(3-2*t);
+      interior=0.31+0.095*t;
+    }else{
+      t=Math.min(1,(v-0.43)/0.57);
+      interior=0.018+0.387*Math.pow(1-t,1.45);
+    }
+    var recogida=Math.exp(-Math.pow((v-0.43)/0.105,2));
+    var exterior=0.51-0.045*recogida;
+    var amplitud=Math.min(0.085,ancho*0.037)*(1-0.72*recogida);
+    for(var i=0;i<=nx;i++){
+      var u=i/nx, fase=u*Math.PI*12+0.18*Math.sin(v*Math.PI*2);
+      var pliegue=Math.cos(fase), secundario=Math.cos(fase*2)*0.16;
+      var px=lado*ancho*(interior+(exterior-interior)*u);
+      var py=0.025+v*(alto*1.055-0.025);
+      py-=0.014*(1-v)*Math.sin(u*Math.PI*6);
+      var pz=amplitud*(pliegue+secundario)+0.025*Math.sin(v*Math.PI);
+      pos.push(px,py,pz);
+      uv.push(u*ancho*0.65,v*alto);
+      // Sombra suave en el fondo del pliegue sin sombras dinámicas.
+      var tono=0.72+0.28*(pliegue+1)/2;
+      colores.push(tono,tono,tono);
+    }
+  }
+  for(var j=0;j<ny;j++)for(var i=0;i<nx;i++){
+    var a=j*(nx+1)+i,b=a+1,c=a+nx+1,d=c+1;
+    if(lado>0)indices.push(a,b,c,b,d,c);
+    else indices.push(a,c,b,b,c,d);
+  }
+  var g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(colores,3));
+  g.setIndex(indices); g.computeVertexNormals();
   return g;
 }
 

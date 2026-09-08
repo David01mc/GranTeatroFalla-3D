@@ -85,6 +85,7 @@ function terrenoAltura(x,z){
 function posicionValida(px,pz){
   var suelo=terrenoAltura(px,pz);
   if(suelo===null) return false;
+  if(geo.bloqueaMampara && geo.bloqueaMampara(px,pz)) return false;
   if(FALLA.puertas && FALLA.puertas.bloquea(px,pz,suelo)) return false;
   if(alturaSalto<=0.02 && !geo.enPlatea(px,pz) && geo.enButacaIndividual(px,pz)) return false;
   return true;
