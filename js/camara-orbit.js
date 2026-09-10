@@ -10,10 +10,10 @@ var destino=null, t0=0, dur=1500, desde=null;
 
 var VISTAS={
   butaca:    {pos:[0.4,1.78+geo.rake(10.4),10.4], mira:[0,4.6,-1]},
-  escenario: {pos:[0,2.9,-geo.frenteEscenico.retiro-1.2],             mira:[0,6.0,15]},
+  escenario: {pos:[0,2.9,-geo.frenteEscenico.retiro-1.2],             mira:[0,6.0,geo.P.fondoSalaZ/2]},
   palco:     {pos:[7.4,7.6,10.5],           mira:[-1,4.5,1]},
-  paraiso:   {pos:[0,11.0,21.5],            mira:[0,4.0,-1]},
-  planta:    {pos:[0,40,14.2],              mira:[0,0,13.4]}
+  paraiso:   {pos:[0,11.0,geo.P.fondoSalaZ-7.9],            mira:[0,4.0,-1]},
+  planta:    {pos:[0,40,geo.P.fondoSalaZ/2], mira:[0,0,geo.P.fondoSalaZ/2]}
 };
 
 function suave(t){ return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }

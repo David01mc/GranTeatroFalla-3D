@@ -18,6 +18,16 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | `enlaceAlfombra` | Trapecio que une alfombras con orientaciones o anchuras distintas. |
 | `remuestreaLinea` | Reparte una polilínea en N puntos equidistantes por longitud de arco. Es lo que permite emparejar dos curvas de distinta densidad en una `banda` sin que los cuadriláteros salgan sesgados. |
 
+## Dimensiones de la sala
+
+`P.patio` fija 18 filas, primera fila en z = 3,80 m, paso de 1 m y 2,50 m desde el extremo posterior del respaldo hasta el frente de la plataforma central de los tres arcos. La medida se toma sobre el eje longitudinal; no hasta el muro situado 2,90 m detrás de ese frente. `respaldoFondo` recoge la extensión posterior de la malla; la variación de giro y escala de las instancias modifica la medida unos 2 mm.
+
+El fondo de la planta queda en z = 26,566 m, el frente de plataforma en 23,666 m, el centro de elipse en 8,855 m y el semieje longitudinal en 17,711 m. Centro y semieje se derivan juntos para conservar la embocadura en z = 0. La anchura y las cotas de los pisos permanecen fijas, incluida la platea a 1,222 m.
+
+Las rampas posteriores y la sala de autoridades del principal se posicionan respecto de `P.fondoSalaZ`. Las filas laterales adaptan su capacidad a la nueva curva, reservando el espacio de plataforma y pasillo; geometría y colisiones utilizan ese mismo reparto. Quedan 360 butacas en el patio y 208 en el anfiteatro del segundo piso.
+
+Comprobación reproducible con el mismo bundle de Three.js r128 que utiliza la aplicación: `node tests/dimensiones.cjs /ruta/three-r128.min.js`. Verifica las filas, separación sobre las mallas, simetría, ausencia de solapes de butacas, cotas de rampas y construcción de la escena.
+
 ## Patio de butacas y pasillos
 
 | Función | Objeto o responsabilidad |
@@ -58,7 +68,7 @@ Este archivo describe qué parte visible o interactiva del teatro controla cada 
 | `mamparasEscaleras` | Mamparas mudéjares de tres arcos junto al palco 2. |
 | `texturaSalida` | Cartel generado para “SALIDA / EXIT”. |
 | `salidasEscalerasPasillo` | Rellanos que comunican las escaleras con el corredor posterior. |
-| `cajaEscaleraPrimerPiso` | Caja de escalera de un ala (`signo` = ±1). **Cinco vuelos alfombrados**: tres de platea a 4,35 y dos más hasta 7,10, éstos apilados sobre los primeros. Los de la tanda baja son macizos desde la solera; los altos no pueden serlo —se tragarían a los de abajo—, así que van en losa inclinada de 28 cm y se camina por debajo. Los muros suben hasta el paraíso. El último peldaño de cada tanda desemboca directamente en el corredor de su piso. |
+| `cajaEscalera` | Caja cuadrada de 9,20 × 9,20 m por ala, con vuelos y rellanos de 3,20 m. Repite tres vuelos por planta: nueve hasta el paraíso. Cada distribuidor comunica la llegada, el siguiente arranque y el corredor de su piso. Las losas superiores tienen 28 cm de canto; los cerramientos y la cubierta alcanzan 2,80 m sobre la última llegada. |
 
 ## Palcos de platea
 
@@ -105,7 +115,7 @@ Las butacas son las mismas instancias que las del patio: `instanciaButacas()` ac
 
 **Cotas de los forjados y altura libre.** El segundo está a 7,10 y el paraíso a 9,90. Antes estaban en 6,70 y 9,60, y con esas cotas el principal se quedaba en **2,35 m libres**, el mínimo de la sala y 53 cm por debajo de los palcos de platea que tiene justo debajo: los 25 cm del entresuelo decorativo salieron de ese hueco al subir su suelo de 4,10 a 4,35. Ahora quedan 2,88 (platea) · 2,75 (principal) · 2,80 (segundo) · 3,50 (paraíso), dentro de los 13,40 de `P.altura`. Los arcos de las portadas del principal cuelgan de `P.pisos[2].y`, así que suben con el forjado: su luz pasa de 2,01 a 2,41 m.
 
-**Circulación del segundo piso.** Su anillo estaba construido pero era inalcanzable —ni escalera, ni corredor, ni puertas—, de modo que sus palcos frontales no tenían acceso. Ahora la caja llega a 7,10 y el piso recibe el mismo par que el principal: `antepalcosPlatea` con puerta contra el muro y `pasilloCurvoPalcos` continuo por detrás, ambos con `nivel` 2. No hace falta pasaje especial para los frontales: `uneContornoAPared` los deja como prolongación del propio anillo, así que se llega a ellos caminando por la balconada. `alturaCajaEscalera(x,z,yRef)` pasa a recoger todas las cotas de un punto y devolver la más cercana a la de quien camina — con los vuelos apilados hay dos cotas pisables sobre la misma vertical—, y `paseo.js` sigue esa referencia en `yPie` y reconoce los niveles 0, 1 y 2.
+**Circulación vertical.** Las dos cajas repiten la misma distribución desde platea hasta principal (4,35 m), segundo (7,10 m) y paraíso (9,90 m). Un distribuidor de 3,20 m de fondo conecta cada desembarco con el siguiente arranque y con un puente al corredor. Los extremos de los corredores altos se recortan en z = 1,20 m para no cubrir los vuelos; el paraíso recibe también corredor y pavimento de enlace. `alturaCajaEscalera(x,z,yRef)` selecciona la superficie más cercana a los pies entre todos los módulos apilados, y el paseo obtiene el nivel de la lista de cotas, sin limitarlo a dos pisos.
 
 El segundo piso no crea otro palco frontal. `uneContornoAPared` recorta por separado su borde interior y exterior en `z = 1,80 m`. La barandilla nace en la arista interior de la mampara (`x = 9,00 m`) y el suelo alcanza su arista exterior (`x = 11,50 m`). No hay geometría transversal sobre el panel: ambos contornos salen hacia el fondo y recuperan gradualmente su curva original durante los 4,60 m siguientes. Suelo, intradós, barandilla, moldura y separadores comparten este trazado.
 
@@ -175,7 +185,7 @@ Es la zona más entrelazada del archivo: valla, suelo, canto y mamparas comparte
 | `TELON_ANCHO`, `TELON_ALTO`, `TELON_Z`, `TELON_X_ABIERTO`, `TELON_DURACION` | Dimensiones, posición y tiempo de apertura del telón. |
 | `FONDO_MAMPARA` | Espesor de las mamparas. Único mando: lo usan la extrusión, el fondo de las jambas y el retranqueo de media pieza contra la alfombra. |
 | `HOLGURA_VALLA_ALFOMBRA` | Separación entre la valla y el borde visible de la alfombra. Único mando para acercarla o separarla; a cero, la curva de la valla cae justo sobre el borde. |
-| `CAJA_ESCALERA` | Planta, boca, hueco de losa, vuelos, rellanos, huella, contrahuella y cotas de la caja de escalera, que ahora sirve **dos plantas**: 6,44 × 4,34 m, con la boca retirada a z=1,20 para no amontonar los dos desembarcos contra el pasillo EXIT — el vestíbulo que salva esos 60 cm lo pavimenta `salidasEscalerasPasillo` y lo declara `enSalidaPasillo`. Cada vuelo y cada rellano llevan su `nivel`, y los vuelos pueden llevar su propio nº de peldaños (7 abajo, 8 arriba, para que las dos tandas queden igual de empinadas: 0,149 y 0,172 de contrahuella). Su `xMax` marca además dónde termina el pasillo EXIT (`salidasEscalerasPasillo` y `enSalidaPasillo` lo leen de aquí), para que pasillo y caja topen sin rincones muertos. Fuente única: de aquí salen tanto la geometría visible como las colisiones, y todo se deriva de `W`, `HUELLA` y `PELDANOS`, de modo que la escalera sigue cuadrando si se cambian. Definida en x positivo; `alturaCajaEscalera` trabaja sobre `\|x\|` y ambas alas son la misma sala reflejada. |
+| `CAJA_ESCALERA` | Fuente compartida de geometría y navegación. Define una planta cuadrada mediante `W=3.20`, `HUELLA=0.40` y `PELDANOS=7`. Genera tres vuelos y sus rellanos entre cada pareja de cotas de `niveles`, derivadas de platea y `P.pisos`. Todas las plantas conservan la misma huella; cambia solo la contrahuella. `xMax` prolonga el pasillo EXIT hasta la nueva caja. Las dos alas se reflejan sobre X. |
 
 ## Regla para futuras modificaciones
 

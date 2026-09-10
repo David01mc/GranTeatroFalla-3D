@@ -22,7 +22,7 @@ var camara=null, elemento=null;
 var yaw=0, pitch=0;
 var teclas={};
 var x=0, z=0;               // posición horizontal del jugador
-var nivelActual=0;           // 0=platea, 1=principal (4,35 m), 2=segundo (6,70 m)
+var nivelActual=0;           // Índice de P.pisos; 0 corresponde a platea.
 /* Cota de los pies en el fotograma anterior. La caja de escalera tiene
    ahora dos cotas pisables sobre un mismo punto —los vuelos altos van
    encima de los bajos—, y ésta es la referencia con la que se decide
@@ -48,6 +48,10 @@ function terrenoAltura(x,z){
     var pasoPosterior=nivelActual===0 && ax>acceso.pasoMin+0.28 && ax<acceso.pasoMax-0.28;
     if(Math.abs(z-zMuro)<margen && !pasoPosterior) return null;
   }
+  // El frente curvo vuela sobre el foso. Resolver primero su superficie
+  // exacta evita que un paso lateral cambie de golpe al suelo inferior.
+  var sueloFrontal=geo.alturaSueloPalcoFrontal && geo.alturaSueloPalcoFrontal(x,z,nivelActual);
+  if(sueloFrontal!==null && sueloFrontal!==undefined)return sueloFrontal;
   var esc=geo.escenario;
   if(ax <= esc.mitadX){
     if(geo.bloqueaBarandillaFoso(x,z))return null;
@@ -63,16 +67,19 @@ function terrenoAltura(x,z){
   var c=geo.cajaEscalera;
   var alturaCaja=geo.alturaCajaEscalera(x,z,yPie);
   if(alturaCaja!==null){
-    nivelActual = alturaCaja>(c.primerPisoY+c.segundoPisoY)/2 ? 2
-                : alturaCaja>(c.baseY+c.primerPisoY)/2       ? 1 : 0;
+    nivelActual=0;
+    for(var n=1;n<c.niveles.length;n++){
+      if(alturaCaja>(c.niveles[n-1]+c.niveles[n])/2) nivelActual=n;
+    }
     return alturaCaja;
   }
 
   if(nivelActual>=1){
-    if(geo.enNivelPalcos(nivelActual,x,z))return geo.P.pisos[nivelActual].y;
+    if((ax>=c.xMin && geo.enSalidaPasillo(x,z)) || geo.enNivelPalcos(nivelActual,x,z))return geo.P.pisos[nivelActual].y;
     return null;
   }
 
+  if(geo.bloqueaBarandillaPalcoFrontal(x,z,yPie)) return null;
   var alturaPalcoFrontal=geo.alturaAccesoPalcoFrontal(x,z);
   if(alturaPalcoFrontal!==null) return alturaPalcoFrontal;
 
@@ -98,7 +105,8 @@ function terrenoAltura(x,z){
 function posicionValida(px,pz){
   var suelo=terrenoAltura(px,pz);
   if(suelo===null) return false;
-  if(geo.bloqueaMampara && geo.bloqueaMampara(px,pz)) return false;
+  if(geo.bloqueaVallaFrontal && geo.bloqueaVallaFrontal(px,pz,yPie+alturaSalto)) return false;
+  if(geo.bloqueaMampara && geo.bloqueaMampara(px,pz,yPie+alturaSalto)) return false;
   if(FALLA.puertas && FALLA.puertas.bloquea(px,pz,suelo)) return false;
   if(alturaSalto<=0.02 && !geo.enPlatea(px,pz) && geo.enButacaIndividual(px,pz)) return false;
   return true;
@@ -198,7 +206,7 @@ function entrar(camaraRef, el, cb){
   x=camara.position.x; z=camara.position.z;
   yPie=camara.position.y-ALTURA_OJO;
   nivelActual=0;
-  for(var nv=2;nv>=1;nv--){
+  for(var nv=geo.P.pisos.length-1;nv>=1;nv--){
     if(geo.enNivelPalcos(nv,x,z) && camara.position.y>geo.P.pisos[nv].y){ nivelActual=nv; break; }
   }
 

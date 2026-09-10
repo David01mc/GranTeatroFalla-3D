@@ -10,10 +10,12 @@ window.FALLA = window.FALLA || {};
    Cambiando estas cifras cambia el edificio entero.
 -------------------------------------------------------------------*/
 var P = {
+  patio:{filas:18,primeraFilaZ:3.8,pasoFila:1.00,
+    respaldoFondo:0.3661794066429138, // Extremo posterior de la malla de butaca.
+    pasoTrasero:2.50},              // Del respaldo al frente de plataforma, en el eje central.
+  cotaPlatea:1.222,                 // Cota conservada al acortar la planta.
   jamba: 12.4,       // media anchura de la sala en la embocadura (y de toda la planta en z=0)
-  zc: 9.8,            // centro de la elipse de la herradura (profundidad)
   Rx: 14.318,        // semieje de la elipse en anchura (algo mayor que jamba: la sala se abre poco a poco)
-  Rz: 19.6,          // semieje de la elipse en profundidad
   tmax: 120*Math.PI/180,
   rake: 0.030,       // pendiente del patio (3 cm por metro, aprox. 1.7 grados)
   zRake: 2.0,
@@ -42,6 +44,13 @@ var P = {
   ],
   arcoA: 7.5        // semianchura libre de la boca escénica
 };
+
+// La fila final y el paso trasero gobiernan la profundidad. Resolver a
+// la vez centro y semieje mantiene la embocadura en z=0.
+P.fondoSalaZ=P.patio.primeraFilaZ+(P.patio.filas-1)*P.patio.pasoFila+
+  P.patio.respaldoFondo+P.patio.pasoTrasero+P.pisos[0].dentro;
+P.Rz=P.fondoSalaZ/(1-Math.cos(P.tmax));
+P.zc=-P.Rz*Math.cos(P.tmax);
 
 function rake(z){ return P.rake * Math.max(0, z - P.zRake); }
 
@@ -114,7 +123,7 @@ function alturaEscaleraLateral(x,z){
 // Llegan hasta la misma corona exterior en la que se apoyan las
 // portadas de los palcos. El antiguo final (26.70) coincidía con la
 // barandilla interior y comprimía los cinco vanos del fondo.
-var RAMPAS_TRASERAS={xInicio:3.40,xFin:4.60,ancho:1.35,anchoFin:1.70,zInicio:23.15,zFin:28.62};
+var RAMPAS_TRASERAS={xInicio:3.40,xFin:4.60,ancho:1.35,anchoFin:1.70,zInicio:P.fondoSalaZ-6.25,zFin:P.fondoSalaZ-0.78};
 function centroRampaTrasera(z){
   var r=RAMPAS_TRASERAS,t=Math.max(0,Math.min(1,(z-r.zInicio)/(r.zFin-r.zInicio)));
   t=t*t*(3-2*t);
@@ -130,7 +139,7 @@ function alturaRampaTrasera(x,z){
   if(Math.abs(Math.abs(x)-centroRampaTrasera(z))>anchoRampaTrasera(z)/2 || z<r.zInicio || z>r.zFin)return null;
   var t=(z-r.zInicio)/(r.zFin-r.zInicio);
   t=t*t*(3-2*t);
-  var y0=rake(r.zInicio),y1=rake(P.zc+P.Rz)+0.40;
+  var y0=rake(r.zInicio),y1=P.cotaPlatea;
   return y0+(y1-y0)*t;
 }
 
@@ -160,7 +169,7 @@ function dentroDePlanta(x,z){
 /* Huella horizontal de la platea inferior. Es la franja comprendida
    entre el muro exterior y el borde retranqueado 2.9 m, desde el final
    del pasillo transversal hacia el fondo de la herradura. */
-var plateaAltura=rake(P.zc+P.Rz)+0.40;
+var plateaAltura=P.cotaPlatea;
 var BORDE_PLATEA=dentro(PLAN,P.pisos[0].dentro);
 var EXTERIOR_ANTEPALCO=dentro(PLAN,-2.0);
 // El antepalco termina a -2 m; desde ahí se mide el corredor posterior.
@@ -175,94 +184,46 @@ var BORDES_NIVELES=P.pisos.map(function(piso){return dentro(PLAN,piso.dentro);})
    suelo que existe ni deje pisar uno que no. */
 function fijaBordeNivel(nivel,contorno){ BORDES_NIVELES[nivel]=contorno; }
 
-/* Caja de escalera de acceso al primer piso, anexa a cada extremo del
-   corredor posterior. La planta reproduce el boceto: la caja cuelga al
-   sur del pasillo EXIT y ocupa su mismo tramo de x, de modo que se abre
-   de frente nada más salir —no pasado el cartel—, con tres vuelos
-   girando alrededor de un hueco central: sube por el lado de fuera,
-   cruza al fondo y vuelve por el lado del teatro hasta desembarcar a la
-   cota del primer piso, pegado al muro por el que algún día se entrará
-   al piso principal.
-
-   Está definida para el ala derecha (x positivo). alturaCajaEscalera
-   trabaja sobre |x| y la geometría se construye dos veces, con signo,
-   de modo que ambas alas comparten estas mismas cotas. */
+/* Caja cuadrada repetible por planta, reflejada en ambas alas. Cada
+   módulo usa tres vuelos y un distribuidor norte en las mismas posiciones;
+   solo cambia la contrahuella para alcanzar la cota del siguiente piso. */
 var CAJA_ESCALERA=(function(){
-  var W=2.10;                    // ancho de vuelo y de rellano
-  var HUELLA=0.32, PELDANOS=7;
-  var CORRIDA=HUELLA*PELDANOS;   // 2.24 m de proyección horizontal por vuelo
-  var y0=plateaAltura, y3=P.pisos[1].y, y6=P.pisos[2].y;
-  // Dos tandas con contrahuella propia: la de abajo salva 3,13 m en tres
-  // vuelos y la de arriba 2,35 m en dos. Cada tanda es regular en sí
-  // misma, que es lo que se nota al subir.
-  /* La tanda alta salva más desnivel en menos vuelos, así que lleva un
-     peldaño más cada uno: con los 7 de abajo la contrahuella se iba a
-     0,196 y se notaba el cambio de pendiente a media subida. Con 8 la
-     huella baja a 0,28 —el mínimo cómodo— y las dos tandas quedan casi
-     iguales de empinadas. */
-  var PELDANOS_ALTO=8;
-  var pasoBajo=(y3-y0)/(3*PELDANOS);        // ≈0,149 m
-  var pasoAlto=(y6-y3)/(2*PELDANOS_ALTO);   // ≈0,172 m
-  var y1=y0+pasoBajo*PELDANOS, y2=y0+pasoBajo*2*PELDANOS;
-  var y4=y3+pasoAlto*PELDANOS_ALTO;
-
-  // xMin deja libre el paño lateral de la embocadura, que cierra el muro
-  // frontal de la sala y se extiende hasta x=15.50.
-  var xMin=15.70;
-  var xBaja=xMin+W/2;            // eje del vuelo que desembarca, junto al teatro
-  var xSube=xBaja+CORRIDA+W;     // eje del vuelo que arranca, al fondo del pasillo
-  var xMax=xSube+W/2;            // 22.14
-
-  /* La boca se retira 60 cm del pasillo EXIT (que llega a z=1,80). Con
-     dos desembarcos —el del principal y el del segundo— apilados sobre
-     la misma arista, dejarla enrasada amontonaba los dos rellanos justo
-     en el borde del pasillo. */
-  var zBoca=1.20;
-  var zGiro=zBoca-CORRIDA;       // fin del vuelo de subida
-  var zMin=zGiro-W;              // testero sur
-  var zCruce=zGiro-W/2;          // eje del vuelo transversal
-
-  /* Los vuelos altos van encima de los bajos, como en cualquier hueco de
-     escalera real, y por eso cada tramo y cada rellano llevan su nivel:
-     alturaCajaEscalera() necesita saber cuál de las dos cotas que hay
-     sobre un mismo punto es la que se está pisando. */
+  var W=3.20, HUELLA=0.40, PELDANOS=7, CORRIDA=HUELLA*PELDANOS;
+  var xMin=15.70, xMax=xMin+2*W+CORRIDA;
+  var xBaja=xMin+W/2, xSube=xMax-W/2;
+  var zMax=1.20, zBoca=zMax-W, zGiro=zBoca-CORRIDA;
+  var zMin=zGiro-W, zCruce=zGiro-W/2;
+  var niveles=[plateaAltura].concat(P.pisos.slice(1).map(function(p){return p.y;}));
+  var tramos=[],rellanos=[],bordes=[];
+  niveles.forEach(function(y,nivel){
+    // Distribuidor completo: comunica el desembarco con el siguiente
+    // arranque sin invadir el hueco ni salir de la caja.
+    rellanos.push({nivel:nivel,xMin:xMin,xMax:xMax,zMin:zBoca,zMax:zMax,y:y});
+    if(nivel===niveles.length-1)return;
+    var subida=(niveles[nivel+1]-y)/3, y1=y+subida,y2=y+2*subida;
+    tramos.push(
+      {nivel:nivel,x0:xSube,z0:zBoca,x1:xSube,z1:zGiro,y0:y,y1:y1},
+      {nivel:nivel,x0:xSube-W/2,z0:zCruce,x1:xBaja+W/2,z1:zCruce,y0:y1,y1:y2},
+      {nivel:nivel,x0:xBaja,z0:zGiro,x1:xBaja,z1:zBoca,y0:y2,y1:niveles[nivel+1]}
+    );
+    rellanos.push(
+      {nivel:nivel,xMin:xSube-W/2,xMax:xMax,zMin:zMin,zMax:zGiro,y:y1},
+      {nivel:nivel,xMin:xMin,xMax:xBaja+W/2,zMin:zMin,zMax:zGiro,y:y2}
+    );
+    bordes.push(
+      [{x:xSube-W/2,z:zBoca},{x:xSube-W/2,z:zGiro}],
+      [{x:xSube-W/2,z:zGiro},{x:xBaja+W/2,z:zGiro}],
+      [{x:xBaja+W/2,z:zGiro},{x:xBaja+W/2,z:zBoca}]
+    );
+  });
   return {
-    xMin:xMin, xMax:xMax, zMin:zMin, zMax:zBoca,
-    // La arista norte entera queda abierta: el pasillo EXIT se alarga
-    // justo hasta xMax para topar con la caja, sin rincones muertos.
-    boca:{xMin:xMin, xMax:xMax},
-    /* Hueco que las losas de los pisos altos tienen que recortar para
-       no tapar la caja vista desde abajo: el carril oeste, por donde
-       desembarcan los vuelos, desde el giro hasta la boca. */
-    huecoLosa:{xMin:xMin, xMax:xBaja+W/2, zMin:zGiro, zMax:zBoca},
-    anchoTramo:W, peldanos:PELDANOS, huella:HUELLA,
-    contrahuella:pasoBajo, contrahuellaAlta:pasoAlto,
-    baseY:y0, primerPisoY:y3, segundoPisoY:y6,
-    tramos:[
-      // De la platea al principal.
-      {nivel:0, x0:xSube,     z0:zBoca,  x1:xSube,     z1:zGiro, y0:y0, y1:y1},
-      {nivel:0, x0:xSube-W/2, z0:zCruce, x1:xBaja+W/2, z1:zCruce, y0:y1, y1:y2},
-      {nivel:0, x0:xBaja,     z0:zGiro,  x1:xBaja,     z1:zBoca, y0:y2, y1:y3},
-      // Del principal al segundo, sobre los dos primeros.
-      {nivel:1, peldanos:PELDANOS_ALTO, x0:xSube,     z0:zBoca,  x1:xSube,     z1:zGiro, y0:y3, y1:y4},
-      {nivel:1, peldanos:PELDANOS_ALTO, x0:xSube-W/2, z0:zCruce, x1:xBaja+W/2, z1:zCruce, y0:y4, y1:y6}
-    ],
-    rellanos:[
-      {nivel:0, xMin:xSube-W/2, xMax:xMax,      zMin:zMin, zMax:zGiro, y:y1},
-      {nivel:0, xMin:xMin,      xMax:xBaja+W/2, zMin:zMin, zMax:zGiro, y:y2},
-      {nivel:1, xMin:xSube-W/2, xMax:xMax,      zMin:zMin, zMax:zGiro, y:y4},
-      // Galería de llegada al segundo: del final del último vuelo hasta
-      // la boca, que es por donde se sale al corredor de ese piso.
-      {nivel:1, xMin:xMin,      xMax:xBaja+W/2, zMin:zMin, zMax:zBoca, y:y6}
-    ],
-    // Aristas que dan al hueco central, una por tramo, para la barandilla.
-    bordesInteriores:[
-      [{x:xSube-W/2,z:zBoca}, {x:xSube-W/2,z:zGiro}],
-      [{x:xSube-W/2,z:zGiro}, {x:xBaja+W/2,z:zGiro}],
-      [{x:xBaja+W/2,z:zGiro}, {x:xBaja+W/2,z:zBoca}],
-      [{x:xSube-W/2,z:zBoca}, {x:xSube-W/2,z:zGiro}],
-      [{x:xSube-W/2,z:zGiro}, {x:xBaja+W/2,z:zGiro}]
-    ]
+    xMin:xMin,xMax:xMax,zMin:zMin,zMax:zMax,
+    boca:{xMin:xMin,xMax:xMax},
+    huecoLosa:{xMin:xMin,xMax:xMax,zMin:zMin,zMax:zBoca},
+    anchoTramo:W,peldanos:PELDANOS,huella:HUELLA,canto:0.28,
+    baseY:niveles[0],primerPisoY:niveles[1],segundoPisoY:niveles[2],
+    niveles:niveles,techoY:niveles[niveles.length-1]+2.80,
+    tramos:tramos,rellanos:rellanos,bordesInteriores:bordes
   };
 })();
 
@@ -271,22 +232,13 @@ function alturaEnTramoCaja(t,x,z){
   var wx=x-t.x0,wz=z-t.z0,u=(wx*vx+wz*vz)/L2;
   var lateral=Math.abs(vx*wz-vz*wx)/Math.sqrt(L2);
   if(u<0 || u>1 || lateral>CAJA_ESCALERA.anchoTramo/2)return null;
-  // Cada tramo puede llevar su propio número de peldaños: los de la
-  // tanda alta reparten más desnivel en la misma corrida.
+  // Permite ajustar el número de peldaños de un tramo sin cambiar su huella.
   var n=t.peldanos||CAJA_ESCALERA.peldanos;
   var escalon=Math.min(n-1,Math.max(0,Math.floor(u*n)));
   return t.y0+(t.y1-t.y0)*(escalon+1)/n;
 }
-/* Cota pisable de la caja de escalera. Trabaja sobre |x|: las dos alas
-   son la misma sala reflejada. El hueco central queda a la cota de
-   partida; el último vuelo desemboca asomado al pasillo a +2.88 m, un
-   desnivel que el modo paseo no deja salvar de un paso, así que a él
-   solo se llega dando la vuelta completa, como en una escalera real. */
-/* Cota pisable de la caja. Sobre un mismo punto hay ahora hasta dos
-   cotas —el vuelo bajo y el que va encima—, así que se recogen todas las
-   candidatas y se devuelve la más cercana a yRef, la altura de quien
-   camina: es la que está pisando de verdad. Sin yRef se devuelve la más
-   baja, que es lo que quiere quien mira la caja desde la solera. */
+/* Selecciona entre las superficies apiladas la más cercana a los pies.
+   Sin referencia devuelve la más baja. Ambas alas usan la misma planta. */
 function alturaCajaEscalera(x,z,yRef){
   var c=CAJA_ESCALERA, ax=Math.abs(x), i, cotas=[];
   if(ax<c.xMin || ax>c.xMax || z<c.zMin || z>c.zMax) return null;
@@ -369,10 +321,34 @@ var ACCESO_PALCO_FRONTAL={
   zCorredorMin:-4.0,zCorredorMax:1.80,puertaZ:0.62,
   xEnlaceMin:8.80,zEnlaceMax:-1.50,
   pasoMin:11.60,pasoMax:13.10,
+  enlaceEscalera:{zMin:-0.50,zMax:1.00,alto:2.25},
   altura:ESCENARIO.altura+0.10
 };
+/* La valla del palco frontal es geometría, no colisión: al pasar de su
+   filo, alturaAccesoPalcoFrontal() devuelve null, terrenoAltura() sigue
+   buscando y acaba dando el patio, así que se cae 1,15 m. Se bloquea la
+   franja inmediatamente por delante de la curva, igual que
+   bloqueaBarandillaFoso() hace con la del foso.
+
+   El bloqueo sólo vale a la cota del palco: esa misma franja, a ras de
+   patio, está bajo el vuelo y hay que poder pasar por debajo. De ahí el
+   yPie, que es la cota de los pies de quien camina. */
+function bloqueaBarandillaPalcoFrontal(x,z,yPie){
+  var a=ACCESO_PALCO_FRONTAL, ax=Math.abs(x);
+  if(yPie===undefined || yPie<a.altura-0.5) return false;
+  if(z<a.zPalcoMin || z>a.zPalcoMax) return false;
+  var t=(z-a.zPalcoMin)/(a.zPalcoMax-a.zPalcoMin);
+  var xFrente=a.xPalcoFrente-a.curvaPalco*Math.sin(Math.PI*t);
+  return ax<xFrente+0.02 && ax>xFrente-0.60;
+}
+
 function alturaAccesoPalcoFrontal(x,z){
   var a=ACCESO_PALCO_FRONTAL,ax=Math.abs(x);
+  var enlace=a.enlaceEscalera;
+  if(ax>a.xCorredorMax && ax<=CAJA_ESCALERA.xMin && z>=enlace.zMin && z<=enlace.zMax){
+    var u=(ax-a.xCorredorMax)/(CAJA_ESCALERA.xMin-a.xCorredorMax);
+    return a.altura+(CAJA_ESCALERA.baseY-a.altura)*u;
+  }
   var t=Math.max(0,Math.min(1,(z-a.zPalcoMin)/(a.zPalcoMax-a.zPalcoMin)));
   var xFrente=a.xPalcoFrente-a.curvaPalco*Math.sin(Math.PI*t);
   var enPalco=ax>=xFrente+0.02 && ax<=a.xPalcoMax &&
@@ -449,6 +425,7 @@ FALLA.geo = {
   escenario:ESCENARIO,
   accesoPalcoFrontal:ACCESO_PALCO_FRONTAL,
   alturaAccesoPalcoFrontal:alturaAccesoPalcoFrontal,
+  bloqueaBarandillaPalcoFrontal:bloqueaBarandillaPalcoFrontal,
   foso:FOSO,
   frenteEscenario:frenteEscenario,
   frenteFoso:frenteFoso,

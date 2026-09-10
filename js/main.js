@@ -26,7 +26,8 @@ function iniciar(){
   });
 
   document.getElementById('datos').textContent =
-    stats.nButacas + ' butacas en ' + stats.nFilas + ' filas · planta en herradura de ' +
+    stats.nButacasPatio + ' butacas en ' + stats.nFilas + ' filas de patio · ' +
+    stats.nButacasAnfiteatro + ' plazas en el anfiteatro · planta en herradura de ' +
     (FALLA.geo.P.Rx*2).toFixed(1) + ' m · generado por código, sin malla importada';
 
   var botonesVista=document.querySelectorAll('[data-vista]');
@@ -70,10 +71,15 @@ function iniciar(){
   });
 
   var btTelon=document.getElementById('telon');
-  btTelon.addEventListener('click', function(){
-    var cerrado=FALLA.telon.alternar();
+  function rotulaTelon(cerrado){
     btTelon.setAttribute('aria-pressed', cerrado?'true':'false');
     btTelon.textContent = cerrado ? 'Abrir telón' : 'Cerrar telón';
+  }
+  // El rótulo sale del estado real del telón, no del que traiga escrito
+  // el HTML: si cambia el valor inicial, el botón lo sigue solo.
+  rotulaTelon(FALLA.telon.cerrado);
+  btTelon.addEventListener('click', function(){
+    rotulaTelon(FALLA.telon.alternar());
   });
 
   /* El modo paseo anda con WASD y mira con el pointer lock: en un

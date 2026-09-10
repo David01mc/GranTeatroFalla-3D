@@ -24,18 +24,75 @@ function perfilCortina(ancho, pliegues, profundidad, segPorPliegue){
 
 /* Cortina de terciopelo: una cinta vertical (de yb a yt) que sigue un
    perfil con pliegues, con la textura de tela mapeada a lo largo de
-   la propia tela (así los pliegues no la estiran ni la comprimen). */
-function cortina(perfil, yb, yt, mat, repV){
-  var g=new THREE.BufferGeometry(), pos=[], uv=[], idx=[], i, dist=0;
+   la propia tela (así los pliegues no la estiran ni la comprimen).
+
+   Sin "op" el paño es una cinta de dos filas de vértices, que es cuanto
+   necesitan las patas y los subtelones. El telón de boca sí necesita
+   detalle en vertical —recogerse contra la barra, caer en el bajo y
+   llevar la sombra del pliegue horneada—, y eso pide filas intermedias.
+   op admite:
+     filas    nº de tramos en vertical (1 = comportamiento anterior).
+     apriete  amplitud del pliegue en la coronación respecto al pie: la
+              tela se pinza en la barra y se abre al caer.
+     comba    cuánto baja el borde inferior en las crestas del pliegue.
+              Un bajo perfectamente recto delata la extrusión.
+     sombra   {pliegue, pie} para hornear el claroscuro en el atributo
+              color: el valle del pliegue se oscurece "pliegue" y el pie
+              del paño queda al "pie" de la luz que recibe la coronación.
+   El atributo color se emite siempre —blanco cuando no hay sombra— para
+   que un material con vertexColors pueda pintar cualquier cortina sin
+   quedarse a oscuras por falta de atributo. */
+function cortina(perfil, yb, yt, mat, repV, op){
+  op = op || {};
+  var filas   = Math.max(1, Math.round(op.filas||1));
+  var apriete = (op.apriete===undefined) ? 1 : op.apriete;
+  var comba   = op.comba || 0;
+  var sombra  = op.sombra;
+  var g=new THREE.BufferGeometry(), pos=[], uv=[], col=[], idx=[], i, j;
+
+  // Distancia acumulada y amplitud máxima: ambas se calculan sobre el
+  // perfil recibido, no fila a fila, para que la tela no se cizalle.
+  var dist=[0], zMedio=0;
+  for(i=0;i<perfil.length;i++) zMedio+=perfil[i].z;
+  zMedio/=perfil.length;
+  var zMax=Math.abs(perfil[0].z-zMedio);
+  for(i=1;i<perfil.length;i++){
+    dist.push(dist[i-1]+Math.hypot(perfil[i].x-perfil[i-1].x, perfil[i].z-perfil[i-1].z));
+    zMax=Math.max(zMax, Math.abs(perfil[i].z-zMedio));
+  }
+  if(zMax<1e-6) zMax=1;
+
   for(i=0;i<perfil.length;i++){
     var p=perfil[i];
-    if(i>0) dist += Math.hypot(p.x-perfil[i-1].x, p.z-perfil[i-1].z);
-    pos.push(p.x,yb,p.z, p.x,yt,p.z);
-    uv.push(dist*0.4,0, dist*0.4,repV);
+    for(j=0;j<=filas;j++){
+      var v=j/filas;                       // 0 al pie del paño, 1 en la barra
+      var f=1+(apriete-1)*v;               // el pliegue se recoge hacia arriba
+      var y=yb+(yt-yb)*v;
+      if(j===0) y-=comba*Math.abs(p.z-zMedio)/zMax;
+      /* El pinzado se mide desde el plano medio de la tela. Escalando el
+         z absoluto, un perfil que ya trae su cota incorporada —el telón
+         de boca cuelga en z=-0,9— se inclinaría hacia la sala al subir. */
+      pos.push(p.x, y, zMedio+(p.z-zMedio)*f);
+      uv.push(dist[i]*0.4, repV*v);
+      if(sombra){
+        // El público mira hacia -z, de modo que la cresta (z mayor) es
+        // la que recibe la luz y el valle el que se hunde en sombra.
+        var t=(p.z-zMedio)/zMax*0.5+0.5;
+        var c=1-(sombra.pliegue||0)*(1-t);
+        var pie=(sombra.pie===undefined)?1:sombra.pie;
+        c*=pie+(1-pie)*Math.pow(v,0.6);
+        col.push(c,c,c);
+      }else col.push(1,1,1);
+    }
   }
-  for(i=0;i<perfil.length-1;i++){ var a=i*2; idx.push(a,a+1,a+2, a+1,a+3,a+2); }
+  var paso=filas+1;
+  for(i=0;i<perfil.length-1;i++) for(j=0;j<filas;j++){
+    var a=i*paso+j, b=a+1, c2=(i+1)*paso+j, d=c2+1;
+    idx.push(a,b,c2, b,d,c2);
+  }
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv,2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col,3));
   g.setIndex(idx); g.computeVertexNormals();
   return new THREE.Mesh(g,mat);
 }
