@@ -3486,20 +3486,29 @@ function construir(escena){
 
   var lam=lampara(); lam.position.set(0,alturaLampara(),13.5); escena.add(lam);
 
-  // Luz: cálida, poca, como en sala antes de empezar.
-  escena.add(new THREE.AmbientLight(0xffddb8, 0.42));
-  escena.add(new THREE.HemisphereLight(0xffe0b0, 0x1a0c0e, 0.45));
-  var araña=new THREE.PointLight(0xffcf8a, 0.95, 40); araña.position.set(0,alturaLampara()-0.2,13.5); escena.add(araña);
-  var focoIzq=new THREE.PointLight(0xffb88a, 0.35, 26); focoIzq.position.set(-7,6,9); escena.add(focoIzq);
-  var focoDer=new THREE.PointLight(0xffb88a, 0.35, 26); focoDer.position.set(7,6,9); escena.add(focoDer);
-  var candilejas=new THREE.PointLight(0xfff0d0, 1.1, 30); candilejas.position.set(0,4.5,-3); escena.add(candilejas);
+  /* Luz: cálida, poca, como en sala antes de empezar. Sin tone mapping
+     lo que pasa de 1 se recorta, y con el reparto anterior (ambiente
+     0,42, hemisférica 0,45, araña 0,95) los paramentos de los palcos
+     recibían entre 1,1 y 1,5: los cremas y el blanco del pasillo salían
+     quemados. Ahora quedan en torno a 0,7, y el relleno plano pesa
+     menos frente a la araña, que es la que da volumen. */
+  escena.add(new THREE.AmbientLight(0xffddb8, 0.26));
+  escena.add(new THREE.HemisphereLight(0xffe0b0, 0x1a0c0e, 0.28));
+  var araña=new THREE.PointLight(0xffcf8a, 0.80, 40); araña.position.set(0,alturaLampara()-0.2,13.5); escena.add(araña);
+  var focoIzq=new THREE.PointLight(0xffb88a, 0.22, 26); focoIzq.position.set(-7,6,9); escena.add(focoIzq);
+  var focoDer=new THREE.PointLight(0xffb88a, 0.22, 26); focoDer.position.set(7,6,9); escena.add(focoDer);
+  // Alcance de 16 m: basta para la boca y el telón, a 3 m. Con 30 m
+  // alcanzaba de lleno los palcos junto a la embocadura y los dejaba
+  // más claros que el resto de la herradura.
+  var candilejas=new THREE.PointLight(0xfff0d0, 1.1, 16); candilejas.position.set(0,4.5,-3); escena.add(candilejas);
   // Los Palcos Frontales quedan en un rincón que ninguna de las luces de
   // arriba alcanza bien (lejos de la araña, por debajo de los focos
   // laterales): sin luz propia, la barandilla dorada y las sillas se ven
-  // casi negras contra el muro. Una luz suave por palco basta.
+  // casi negras contra el muro. Una luz suave por palco basta, con un
+  // alcance que no pase del propio palco a los vecinos.
   var limFrontalLuz=limitesFrontal();
   [-1,1].forEach(function(signo){
-    var focoFrontal=new THREE.PointLight(0xffcf9a, 0.55, 12);
+    var focoFrontal=new THREE.PointLight(0xffcf9a, 0.30, 7);
     focoFrontal.position.set(signo*((limFrontalLuz.xFondo+limFrontalLuz.xFrente)/2+DESPLAZAMIENTO_FRONTAL_X), 2.6, (Z_CORREDOR_INI+geo.frenteEscenico.zInicioPalcos)/2);
     escena.add(focoFrontal);
   });
