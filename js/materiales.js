@@ -73,8 +73,13 @@ texAlfombraEscalera.needsUpdate=true;
    frecuencia y funde los bordes contra su espejo: 0,2x y 0,5 niveles.
    El UV de cortina() ya lleva su propio repetido, de ahí el 1,1. */
 var texTelon        = textura('Textures/TelonSinCostura.webp', 1, 1);
+var texMonogramaTelon=cargador.load('Textures/MonogramaTelonRosa.png');
+texMonogramaTelon.encoding=THREE.sRGBEncoding;
+texMonogramaTelon.wrapS=texMonogramaTelon.wrapT=THREE.ClampToEdgeWrapping;
 var texTechoPalcos  = textura('Textures/TechoPalcosGenerado.png',1,1);
-var texEstucoPilastra=textura('Textures/EstucoPilastraGenerado.png',1,1);
+var texYesoMarco=textura('Textures/YesoMarcoEscenario.png',1,1);
+var texBurdeosMarco=textura('Textures/PinturaBurdeosMarco.png',1,1);
+var texMuralEscenario=cargador.load('Textures/MuralEscenarioAlegorico.png');
 var texPiedraPilastra=textura('Textures/PiedraPilastraGenerada.png',1,1);
 var texMaderaButaca = textura('Textures/MaderaButaca.webp', 1, 1);
 var texMaderaBlanca = textura('Textures/MaderaBlanca.webp', 1, 1);
@@ -120,12 +125,19 @@ var texNogalPatio=textura('Textures/NogalButacaPatioGenerado.png',1,1);
 var texTejidoPatio=textura('Textures/TerciopeloButacaPatioGenerado.png',1,1);
 
 var MAT = {
-  // La imagen aporta solo el microrrelieve; el color coincide con el
-  // blanco roto de las piezas mudéjares. Se oscurece en el albedo porque
-  // sobre la embocadura se suman tres luces cálidas y un valor más alto
-  // termina recortado a blanco puro.
-  estucoPilastra:new THREE.MeshLambertMaterial({bumpMap:texEstucoPilastra,
-                   bumpScale:0.012,color:0x817b70}),
+  // Yeso envejecido con albedo y microrrelieve. Phong permite aplicar
+  // bumpMap (Lambert no lo admite), manteniendo un acabado casi mate.
+  // El tinte compensa la suma de luces cálidas de la embocadura.
+  estucoPilastra:new THREE.MeshPhongMaterial({map:texYesoMarco,bumpMap:texYesoMarco,
+                   bumpScale:0.004,color:0xaaa6a0,shininess:3,specular:0x111111}),
+  marcoYeso:new THREE.MeshPhongMaterial({map:texYesoMarco,bumpMap:texYesoMarco,
+    bumpScale:0.004,color:0xc8c5bb,shininess:3,specular:0x111111,side:THREE.DoubleSide}),
+  marcoRehundido:new THREE.MeshPhongMaterial({map:texYesoMarco,bumpMap:texYesoMarco,
+    bumpScale:0.003,color:0x514944,shininess:2,specular:0x080808,side:THREE.DoubleSide}),
+  marcoBurdeos:new THREE.MeshPhongMaterial({map:texBurdeosMarco,bumpMap:texBurdeosMarco,
+    bumpScale:0.003,color:0xa5a5a5,shininess:2,specular:0x080808,side:THREE.DoubleSide}),
+  muralEscenario:new THREE.MeshLambertMaterial({map:texMuralEscenario,
+    color:0xbab7b0,side:THREE.DoubleSide}),
   piedraPilastra:new THREE.MeshLambertMaterial({map:texPiedraPilastra,color:0xc4c4c4}),
   terciopeloButaca: matTerciopeloButaca,
   maderaButaca:     new THREE.MeshLambertMaterial({map:texMaderaButaca}),
@@ -236,7 +248,11 @@ var MAT = {
      pliegues se aplanan. Toda cortina emite el atributo color —blanco
      cuando no pide sombra—, así que las patas y los subtelones siguen
      viéndose igual que antes. */
-  telon:      new THREE.MeshLambertMaterial({map:texTelon, vertexColors:true,
+  monogramaTelon:new THREE.MeshBasicMaterial({map:texMonogramaTelon,
+    transparent:true,opacity:0.70,blending:THREE.AdditiveBlending,
+    depthWrite:false,vertexColors:true,side:THREE.DoubleSide,
+    polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}),
+  telon:      new THREE.MeshLambertMaterial({map:texTelon, color:0xc998a0, vertexColors:true,
                 side:THREE.DoubleSide})
 };
 

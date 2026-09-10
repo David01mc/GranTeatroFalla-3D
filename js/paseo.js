@@ -40,7 +40,7 @@ function terrenoAltura(x,z){
   // Comprueba las alas antes que la tarima: parte del muro oblicuo
   // coincide en planta con el borde del escenario.
   var boca=geo.embocadura,ax=Math.abs(x);
-  if(boca && ax>geo.P.arcoA && ax<geo.P.jamba+1.0){
+  if(boca && ax>(boca.xInicioAla||geo.P.arcoA) && ax<geo.P.jamba+1.0){
     var pendiente=boca.avance/(boca.xEncuentro-geo.P.arcoA);
     var zMuro=-boca.retiro+Math.min(ax-geo.P.arcoA,boca.xEncuentro-geo.P.arcoA)*pendiente;
     var margen=0.35*(ax<boca.xEncuentro?Math.hypot(1,pendiente):1);

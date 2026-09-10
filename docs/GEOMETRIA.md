@@ -51,14 +51,26 @@ Comprobación reproducible con el mismo bundle de Three.js r128 que utiliza la a
 | Función | Objeto o responsabilidad |
 | --- | --- |
 | `perfilArco` | Perfil 2D del arco rebajado de la embocadura. |
-| `cintaArcoRebajado` | Molduras concéntricas de la embocadura. |
-| `embocadura` | Dintel frontal y alas diagonales hacia los palcos; las pilastras completas giran con las alas. Publica su sección para las colisiones del paseo. |
+| `moldurasMarco` | Barre la sección del marco con aristas redondeadas (recorte de 6,5 cm, 12 muestras por curva), normales continuas y tapas laterales ajustadas. Conserva las cotas constructivas y los límites de la franja de rombos. |
+| `apoyosMarco`, `extremoMarco`, `puntoMarco` | Comparten la posición de las columnas y el nacimiento de los arcos. Los cinco escalones inferiores recorren la arista del capitel; la franja roja y los dos remates continúan sobre la cornisa curva del tercer palco. Los extremos permanecen a 9,90 m mientras las claves ascienden hacia el techo. |
+| `curvaturaMarco`, `planoTelonZ`, `finalMarcoZ`, `alturaMarco` | Los hombros curvos ocupan el 42 % de cada lado y enlazan tangencialmente con un corto tramo central recto. El telón queda en el plano del capitel; la primera moldura, 25 cm por delante. El marco termina en la pared del final del palco (z=1,80), con altura propia independiente del techo. |
+| `embocadura` | Dintel y alas diagonales; pilastras hasta 9,90 m. Cuatro tabicas de 20 cm y una de 40 cm, franja burdeos de 70 cm y dos remates de 15 cm: coronación central a 12,65 m. Encima se construye la pared del mural hasta el techo a 14,90 m, con retornos y trasdós. Publica las alas para las colisiones del paseo. |
 | `perfilCortina`, `perfilMedioTelon`, `cortina` | Geometría ondulada de cortinas y telón. |
 | `juegoTelon` | Bambalinas y patas laterales. |
 | `construirTelonFuncional` | Telón principal animado. |
 | `suaveT`, `actualizarTelon`, `alternarTelon` | Estado y animación de apertura/cierre del telón. |
 | `escenario` | Tarima con borde delantero curvo, faldón de madera, telones y elementos interiores. Alcanza las pilastras, cuyos basamentos nacen sobre las tablas. |
 | `sueloFoso` | Foso transitable a −0,90 m con suelo de madera negra, valla curva junto a la alfombra transversal y dos escaleras laterales de 6 peldaños con rellanos y pasamanos. |
+
+`P.marcoEscenario.anchoColumna` fija un fuste de 1,25 m (antes ocupaba los 2,12 m del ala diagonal). El capitel y los adornos se estrechan con él, conservando el encuentro exterior con el palco. Las medidas de 20/40 cm se conservan en la sección central; los extremos nacen sobre sus apoyos. La coronación se ha bajado de 13,40 a 12,65 m. El techo subió 3,50 m hasta 16,90 para descubrir el mural y después se ha rebajado 2 m, hasta 14,90: quedan 2,25 m de pared pintada sobre el centro (eran 4,25). La pintura, de 18,24 × 7,29 m, sigue anclada al techo porque sus figuras rozan el borde superior; con el techo más bajo el marco oculta más de su parte baja: sobre el centro se ve el 31 % de su altura (antes el 58 %) y en los costados el 69 % (antes el 96 %). Elevar el techo ya no estira las molduras. La lámpara central acompaña la elevación conservando 3 m de descuelgue.
+
+El mural `Textures/MuralEscenarioAlegorico.png` es una interpretación de la referencia, con musas, nubes y ornamentación mudéjar. La proyección respeta la proporción de la imagen y permite que el arco recorte su parte inferior. Véase [MURAL_ESCENARIO.md](MURAL_ESCENARIO.md) para su procedencia y prompt.
+
+La caja escénica y su paño de fondo llegan ahora a `P.altura`: el antiguo techo fijo de 12 m atravesaba la franja inclinada del marco. Las pruebas comprueban también una visual desde el patio hacia esa franja, además de las alturas de las tabicas y los encuentros de las pilastras.
+
+Los laterales de la caja terminan en `geo.frenteEscenico.zInicioPalcos`, dentro del ala de la embocadura. Solo el techo avanza hasta z=0; prolongar también las paredes dejaba una cara oscura atravesando el interior de los tres palcos frontales de cada lado.
+
+El ala diagonal baja ocupa únicamente el ancho de la nueva columna: se elimina el tramo burdeos que quedaba expuesto junto al telón. `geo.embocadura.xInicioAla` comunica ese recorte al paseo. La tela, su monograma y la bambalina avanzan juntos y mantienen la recogida vertical. Las molduras y columnas llevan `YesoMarcoEscenario.png`; la franja, `PinturaBurdeosMarco.png`. Las UV del marco se miden por longitud real en ambas direcciones, a 70 cm por repetición, y los materiales Phong mates aplican un microrrelieve de 3–4 mm. Los prompts y la procedencia están en [TEXTURAS_MARCO.md](TEXTURAS_MARCO.md).
 
 ## Accesos laterales
 
@@ -95,9 +107,9 @@ En el principal, el anillo arranca en `iFrontalD` (primer punto de planta pasada
 
 `adelantaPalcosProscenio()` corrige la planta antes de dibujar nada. Sin él, el anillo arrancaba ya sobre la herradura, en x = 11,14, mientras el frente del palco frontal está en x = 9,00: la valla daba un escalón de 2,14 m justo en la junta entre los dos, con el palco frontal asomado sobre el patio y el palco 2 retranqueado contra el muro.
 
-La función trae el borde interior del principal hasta esa misma línea (`limitesFrontal().xFrente + DESPLAZAMIENTO_FRONTAL_X` = 9,00). Se adelanta **sólo el palco 2**: su frente pasa a ser el del palco frontal y su fondo se queda en el muro, así que gana profundidad hasta 4,15 m. Desde su tabique el borde vuelve a la herradura con un suavizado de pendiente nula al llegar, repartido sobre `PALCOS_VUELTA_PROSCENIO` palcos (hoy 1, el palco 3) y medido sobre el recorrido real de la valla, no por índice. Con 0 el regreso es un ángulo seco y se nota mucho en la celosía vista desde el patio; con 1 el palco 3 hace de embudo y la valla entra en la curva sin quiebro. El corte se toma del mismo reparto por longitud que usa `separadoresPalco()`, no de una distancia aparte, así que el palco 2 llega adelantado exactamente hasta su tabique y no hasta media celda.
+La función trae las caras interior y exterior del principal hasta las líneas del palco frontal. Desde la junta vuelve a la herradura durante `VUELTA_PROSCENIO_Z` = 4,60 m. Primer y segundo piso emplean la misma longitud y el mismo suavizado cúbico: ambos empiezan a girar en la junta y recuperan su trazado original en el mismo plano transversal. El cruce se busca sobre cada contorno transformado, porque `dentro()` desplaza también su coordenada Z. Cada pasada modifica únicamente su ala; recorrer el contorno entero desde ambos extremos hacía que la segunda pasada sobrescribiese la primera con el signo contrario. Valla y entresuelo reciben además puntos de anclaje exactos en `(±9,00, 1,80)`; reutilizar la X del primer vértice muestreado los hacía empezar 40 cm después de la junta. El tramo oculto bajo el palco frontal permanece recto para evitar entrantes.
 
-Medido sobre la escena en el ala derecha, la valla sale del palco frontal (x 8,58–9,00, con su bombeo de 42 cm), sigue recta en x = 8,98 de z = 2,0 a z = 4,4 —el palco 2— y vuelve a la herradura entre z = 4,8 y z = 7,2: 9,31 · 9,61 · 10,12 · 10,68 · 11,24 · 11,48 · 11,58, donde ya coincide con el trazado original. El mayor desvío entre muestras a 40 cm baja de 1,21 m con el regreso seco a 0,56 m con el actual.
+La valla sale del palco frontal sin prolongar una sección recta visible. La transición termina en `Z_CORREDOR_INI + 4,60`, igual que en el segundo piso; suelo, canto, barandilla, separadores y colisiones consumen ese mismo contorno.
 
 `iFrontalD` se elige sobre la planta, pero el borde interior lo produce `dentro()`, que desplaza cada punto por su normal — y junto a la embocadura esa normal tiene mucha componente en z. Resultado: el primer punto del anillo cae en z = 2,67 mientras el palco frontal termina en z = 1,80. Valla y canto arrancaban ahí y dejaban una **cuña de 87 cm de suelo sin cerrar**, por la que se veía la pared del fondo. `bordeAnillo` recibe un punto de arranque adicional en `Z_CORREDOR_INI`, a la misma x (ese tramo ya es recto), para que empalme con el palco frontal. El suelo no lo necesitaba: `banda()` lo cose desde el contorno completo, que sí pasa por ahí.
 
@@ -113,7 +125,7 @@ Las butacas son las mismas instancias que las del patio: `instanciaButacas()` ac
 
 **Todos los niveles llevan la misma valla calada**, a `ALTURA_BARANDILLA` (0,713 m, el tramo recto del separador). El segundo y el paraíso tenían en su lugar un antepecho macizo de granate rematado por una moldura de oro: desde el patio se leían como dos grandes cintas rojas que tapaban la barandilla en vez de dibujarla. Con ellos desaparece también la antigua tapa horizontal del palco, que iba a `yTop` y, con la valla ya en 0,713, flotaba casi medio metro por encima con la textura del techo.
 
-**Cotas de los forjados y altura libre.** El segundo está a 7,10 y el paraíso a 9,90. Antes estaban en 6,70 y 9,60, y con esas cotas el principal se quedaba en **2,35 m libres**, el mínimo de la sala y 53 cm por debajo de los palcos de platea que tiene justo debajo: los 25 cm del entresuelo decorativo salieron de ese hueco al subir su suelo de 4,10 a 4,35. Ahora quedan 2,88 (platea) · 2,75 (principal) · 2,80 (segundo) · 3,50 (paraíso), dentro de los 13,40 de `P.altura`. Los arcos de las portadas del principal cuelgan de `P.pisos[2].y`, así que suben con el forjado: su luz pasa de 2,01 a 2,41 m.
+**Cotas de los forjados y altura libre.** El segundo está a 7,10 y el paraíso a 9,90. Antes estaban en 6,70 y 9,60, y con esas cotas el principal se quedaba en **2,35 m libres**, el mínimo de la sala y 53 cm por debajo de los palcos de platea que tiene justo debajo: los 25 cm del entresuelo decorativo salieron de ese hueco al subir su suelo de 4,10 a 4,35. Ahora quedan 2,88 (platea) · 2,75 (principal) · 2,80 (segundo) · 5,00 (paraíso), dentro de los 14,90 de `P.altura`. Los arcos de las portadas del principal cuelgan de `P.pisos[2].y`, así que suben con el forjado: su luz pasa de 2,01 a 2,41 m.
 
 **Circulación vertical.** Las dos cajas repiten la misma distribución desde platea hasta principal (4,35 m), segundo (7,10 m) y paraíso (9,90 m). Un distribuidor de 3,20 m de fondo conecta cada desembarco con el siguiente arranque y con un puente al corredor. Los extremos de los corredores altos se recortan en z = 1,20 m para no cubrir los vuelos; el paraíso recibe también corredor y pavimento de enlace. `alturaCajaEscalera(x,z,yRef)` selecciona la superficie más cercana a los pies entre todos los módulos apilados, y el paseo obtiene el nivel de la lista de cotas, sin limitarlo a dos pisos.
 
@@ -200,3 +212,17 @@ La floritura de `geometriaBalaustreOrnamental` combina rombos superiores, voluta
 `geo.frenteEscenario(x)` define el borde de la tarima: extremos en z = −1 m y avance central de 0,65 m. `geo.frenteFoso(x)` sitúa el centro de la valla en z = 1,65 m, a 15 cm del borde de la alfombra transversal. Geometría y modo paseo usan estas mismas funciones; el retiro de la caja escénica y los telones sigue siendo 2,5 m. Estas cotas son aproximaciones visuales a las referencias, no medidas del teatro.
 
 El fondo del foso está a y = −0,90 m. `geo.contornoPatioConFoso()` recorta la cavidad en el parquet; `geo.alturaAccesoFoso()` y `geo.bloqueaBarandillaFoso()` mantienen el paseo alineado con ambos accesos. Los vuelos discurren hacia el centro entre |x| = 7,80 y 6,12 m, con huellas de 28 cm y contrahuellas de 15 cm. Los rellanos laterales enlazan con el paso del patio. El faldón curvo del escenario usa `MaderaPlateaInferior.webp`.
+
+
+## Telón y pilastras: referencia frontal
+
+El telón de boca tiene 16 y 17 pliegues en sus hojas, amplitud de 8,5 cm y un bajo ligeramente irregular apoyado sobre las tablas. Conserva la textura de terciopelo, matizada en granate, con sombreado de pliegues y menor oscurecimiento en el pie. La bambalina fija mide 1,65 m de alto, con 34 pliegues y una comba de 4,5 cm. La apertura sigue desplazando las dos hojas; la bambalina permanece inmóvil.
+
+Las pilastras incorporan una segunda cenefa de rombos calados en relieve crema alrededor del panel central, junto a los marcos y la cadena ornamental existentes. La iluminación rosa y la proyección de la fotografía no forman parte del acabado permanente.
+
+
+## Entresuelo entre principal y segundo
+
+`P.entresueloSegundo` define un canto de 25 cm entre y = 6,85 y 7,10 m. `entresueloDecorativoSegundo` sigue el contorno real del segundo piso, con intradós de techo, canto frontal `MAT.entresueloFrente` y cierres de yeso. Repite los apliques de bronce y vidrio del entresuelo inferior a lo largo de la curva, incluido el anfiteatro trasero.
+
+`COTA_BAJO_SEGUNDO` gobierna también los techos y portadas del principal y la base de los palcos frontales superiores. El suelo del segundo permanece a 7,10 m; la altura libre del principal bajo la nueva losa es de 2,50 m.

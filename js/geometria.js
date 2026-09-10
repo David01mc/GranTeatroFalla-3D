@@ -24,6 +24,7 @@ var perfilCortina = piezas.perfilCortina, cortina = piezas.cortina;
 // El suelo principal queda a 4,35 m, pero su línea inferior conserva la
 // cota histórica de 4,10 m; los 25 cm intermedios forman el entresuelo.
 var COTA_BAJO_PRINCIPAL=P.pisos[1].y-P.entresueloPrincipal;
+var COTA_BAJO_SEGUNDO=P.pisos[2].y-P.entresueloSegundo;
 
 /* Cápsulas 2D para las mamparas. El radio suma el grosor de la pieza y
    el cuerpo del visitante, evitando que la cámara llegue a atravesarla.
@@ -213,12 +214,15 @@ function limitesFrontal(){
   return {xFondo:xFondo, xFrente:xFondo-ANCHO_FRONTAL};
 }
 
-/* Ancho de la vuelta a la herradura, en palcos. El palco 2 se adelanta
-   entero; a partir de su tabique el borde regresa a la curva a lo largo
-   de este tramo. En 0 el regreso es un ángulo seco, y se nota mucho en
-   la celosía vista desde el patio; en 1 el palco 3 hace de embudo y la
-   valla entra en la curva sin quiebro. */
-var PALCOS_VUELTA_PROSCENIO=1;
+/* Longitud, medida en z, sobre la que el segundo piso vuelve a la
+   herradura tras la junta con el palco frontal. Es la referencia: da la
+   transición que se quiere en toda la sala.
+
+   El principal usa esta misma longitud. Aunque su retranqueo sea menor,
+   ambas vallas empiezan a girar en la junta y terminan la transición en
+   el mismo plano transversal, evitando que el primer piso parezca tener
+   un tramo recto más largo o una curva de otra familia. */
+var VUELTA_PROSCENIO_Z=4.60;
 
 /* Adelanta el palco 2 del principal —el primero de la balconada, el que
    sigue al palco frontal— hasta la línea del frente de éste. Sin ello el
@@ -227,48 +231,53 @@ var PALCOS_VUELTA_PROSCENIO=1;
    asomaba sobre el patio y el palco 2 quedaba retranqueado contra el
    muro.
 
-   Se adelanta el palco 2 entero: su frente pasa a ser el mismo x que el
-   del palco frontal y su fondo se queda donde está, de modo que gana
-   profundidad. Desde su tabique, el borde vuelve a la herradura con un
-   suavizado de pendiente nula al llegar, repartido sobre
-   PALCOS_VUELTA_PROSCENIO palcos y medido sobre el recorrido real de la
-   valla, no por índice.
+   El borde sale de la junta a la línea del frente y vuelve a la
+   herradura decayendo suavemente durante VUELTA_PROSCENIO_Z metros, que
+   es exactamente la ley que uneContornoAPared() aplica en el segundo
+   piso. Antes había además un tramo perfectamente recto que abarcaba el
+   palco frontal y el primero del anillo, y sólo después empezaba el
+   regreso: ese tramo era lo que endurecía la junta frente a la del
+   segundo, donde la curva nace ya girando.
 
-   El corte se toma del mismo reparto por longitud que usa
-   separadoresPalco(), no de una distancia aparte: así el palco 2 llega
-   adelantado exactamente hasta su tabique y no hasta media celda.
+   Sólo se fuerza a la recta lo que queda por detrás de la junta, bajo el
+   propio palco frontal, donde no se ve y donde mantenerlo alineado evita
+   un entrante entre los dos.
 
-   Devuelve un contorno nuevo. El original no se toca porque geo.dentro()
-   lo recalcula para cada piso y sólo el principal lleva este adelanto. */
-function adelantaPalcosProscenio(borde, palcosLado){
-  var xObjetivo=limitesFrontal().xFrente+DESPLAZAMIENTO_FRONTAL_X;
-  // Junta con el palco frontal (donde arranca el palco 2) y final de la
-  // fila de palcos, que es donde empieza el palco de autoridades.
-  var iRef=0, iLim=borde.length-1, i;
-  for(i=0;i<geo.PLAN.length;i++){ if(geo.PLAN[i].z>=Z_CORREDOR_INI){ iRef=i; break; } }
-  for(i=0;i<geo.PLAN.length;i++){ if(geo.PLAN[i].x<=4.4){ iLim=i; break; } }
-  var corte=indicesPorLongitud(geo.PLAN, iRef, iLim, palcosLado)[1];
-  var largo=0;
-  for(i=iRef+1;i<=iLim;i++) largo+=Math.hypot(borde[i].x-borde[i-1].x, borde[i].z-borde[i-1].z);
-  var vuelta=largo/Math.max(1,palcosLado)*PALCOS_VUELTA_PROSCENIO;
-
+   Devuelve un contorno nuevo, con los mismos índices que geo.PLAN. El
+   original no se toca porque geo.dentro() lo recalcula para cada piso y
+   sólo el principal lleva este adelanto. */
+function adelantaPalcosProscenio(borde,xObjetivo){
+  if(xObjetivo===undefined){
+    xObjetivo=limitesFrontal().xFrente+DESPLAZAMIENTO_FRONTAL_X;
+  }
   var salida=borde.map(function(p){return {x:p.x, z:p.z};});
   var ultimo=borde.length-1;
   [1,-1].forEach(function(signo){
     var en=function(k){ return signo>0?k:ultimo-k; };
-    // Palco frontal y palco 2, a la línea del frente. Por debajo de iRef
-    // el borde va bajo el propio palco frontal: mantenerlo en la misma
-    // recta evita un entrante en la junta entre los dos.
-    for(var k=0;k<=corte;k++) salida[en(k)].x=signo*xObjetivo;
-    if(vuelta<=0) return;
-    var recorrido=0;
-    for(k=corte+1;k<=ultimo;k++){
-      var a=borde[en(k-1)], b=borde[en(k)];
-      recorrido+=Math.hypot(b.x-a.x, b.z-a.z);
-      var t=recorrido/vuelta;
-      if(t>=1) break;                       // ya está sobre la herradura
-      var w=1-(3*t*t-2*t*t*t);
-      salida[en(k)].x=b.x+w*(signo*xObjetivo-b.x);
+    // El cruce pertenece al contorno que se está deformando. Usar aquí
+    // el índice de geo.PLAN era incorrecto: dentro() desplaza también Z
+    // y hacía que el principal empezase la transición demasiado tarde.
+    var iRef=1;
+    while(iRef<ultimo && borde[en(iRef)].z<Z_CORREDOR_INI)iRef++;
+    /* El desplazamiento se mide en el cruce exacto con Z_CORREDOR_INI,
+       no en el primer vértice pasado: el contorno tiene 73 puntos y usar
+       el vértice dejaba la junta unos centímetros fuera de la línea. */
+    var a=borde[en(Math.max(0,iRef-1))], b=borde[en(iRef)];
+    var tc=(Z_CORREDOR_INI-a.z)/((b.z-a.z)||1);
+    var desplazamiento=Math.abs(a.x+(b.x-a.x)*tc)-xObjetivo;
+    // La unión usa exactamente la misma longitud y la misma función de
+    // suavizado que el segundo piso. Así ambos empiezan a curvarse en la
+    // junta y recuperan la herradura en el mismo plano transversal.
+    var vuelta=VUELTA_PROSCENIO_Z;
+    for(var k=0;k<iRef;k++) salida[en(k)].x=signo*xObjetivo;
+    // Cada pasada modifica únicamente su ala. Recorrer hasta `ultimo`
+    // hacía que la pasada izquierda volviese a escribir el ala derecha
+    // con el signo opuesto, empujándola hacia fuera.
+    for(k=iRef;k<=Math.floor(ultimo/2);k++){
+      var p=borde[en(k)];
+      var t=Math.max(0,Math.min(1,(p.z-Z_CORREDOR_INI)/vuelta));
+      t=t*t*(3-2*t);
+      salida[en(k)].x=p.x-signo*desplazamiento*(1-t);
     }
   });
   return salida;
@@ -508,37 +517,131 @@ function piezasButacaPatio(){
    La boca no es de herradura: dos jambas verticales reciben un arco
    muy rebajado, envuelto por arquivoltas y un ancho paño de lacería. */
 function perfilArco(){
-  var pts=[], arranque=8.15, clave=10.45, i, t;
+  var pts=[], arranque=P.pisos[3].y, clave=P.marcoEscenario.clave, i, t;
   pts.push(new THREE.Vector2(P.arcoA,0));
   pts.push(new THREE.Vector2(P.arcoA,arranque));
   for(i=0;i<=48;i++){
     t=i/48;
     pts.push(new THREE.Vector2(
       P.arcoA*(1-2*t),
-      arranque+4*(clave-arranque)*t*(1-t)
+      arranque+(clave-arranque)*curvaturaMarco(t)
     ));
   }
   pts.push(new THREE.Vector2(-P.arcoA,arranque));
   pts.push(new THREE.Vector2(-P.arcoA, 0));
   return pts;
 }
+function curvaturaMarco(t){
+  // Hombros amplios y tendidos, tangentes al corto tramo recto central.
+  var u=Math.min(t,1-t)/P.marcoEscenario.tramoCurvo;
+  return u>=1?1:Math.sin(Math.max(0,u)*Math.PI/2);
+}
+function finalMarcoZ(){
+  return Z_CORREDOR_INI+RETIRO_ESCENARIO_Z;
+}
+function alturaMarco(){
+  var c=P.marcoEscenario;
+  return c.clave+c.escalones.reduce(function(a,b){return a+b;},0)+c.altoFranja+2*c.altoRemate;
+}
 
-function cintaArcoRebajado(yExtra,grosor,z,mat){
-  var n=48,pos=[],uv=[],idx=[],arranque=8.15,clave=10.45;
-  for(var i=0;i<=n;i++){
-    var t=i/n,x=P.arcoA*(1-2*t),y=arranque+4*(clave-arranque)*t*(1-t)+yExtra;
-    pos.push(x,y-grosor/2,z, x,y+grosor/2,z);
-    uv.push(t*3,0,t*3,1);
+// Apoyos compartidos por columnas y arquivoltas. El capitel conserva su
+// extremo junto al palco al estrechar el fuste; su arista delantera es
+// la línea de nacimiento de los cinco primeros escalones.
+function apoyosMarco(){
+  var cfg=P.marcoEscenario,xf=limitesFrontal().xFrente+DESPLAZAMIENTO_FRONTAL_X;
+  var ang=Math.atan2(AVANCE_ALAS_EMBOCADURA,xf-P.arcoA),ux=Math.cos(ang),uz=Math.sin(ang);
+  var ancho=cfg.anchoColumna,escala=ancho/1.34;
+  var centro={x:xf-ux*ancho/2,z:AVANCE_ALAS_EMBOCADURA-uz*ancho/2};
+  function borde(signo){return {x:centro.x+signo*1.04*escala*ux-0.71*uz,
+    z:centro.z+signo*1.04*escala*uz+0.71*ux};}
+  return {centro:centro,angulo:ang,escala:escala,interior:borde(-1),exterior:borde(1),xPalco:xf};
+}
+function extremoMarco(p){
+  var cfg=P.marcoEscenario,ap=apoyosMarco();
+  var alto=cfg.escalones.reduce(function(a,b){return a+b;},0);
+  var finInferior=alto+cfg.escalones.length*cfg.avanceEscalon;
+  var recorrido=p.y+p.z-cfg.zInicio;
+  if(recorrido<=finInferior){
+    var t=Math.max(0,recorrido/finInferior);
+    return {x:ap.interior.x+(ap.exterior.x-ap.interior.x)*t,
+      z:ap.interior.z+(ap.exterior.z-ap.interior.z)*t};
   }
-  for(i=0;i<n;i++){var a=i*2;idx.push(a,a+1,a+2,a+1,a+3,a+2);}
-  var bg=new THREE.BufferGeometry();
-  bg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
-  bg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
-  bg.setIndex(idx); bg.computeVertexNormals();
-  return new THREE.Mesh(bg,mat);
+  var total=alturaMarco()-cfg.clave+finalMarcoZ()-cfg.zInicio;
+  var t=Math.min(1,(recorrido-finInferior)/(total-finInferior));
+  var z=ap.exterior.z+(finalMarcoZ()-ap.exterior.z)*t;
+  function frente(z){
+    var u=(z-RETIRO_ESCENARIO_Z-geo.frenteEscenico.zInicioPalcos)/(Z_CORREDOR_INI-geo.frenteEscenico.zInicioPalcos);
+    return ap.xPalco+RETRANQUEO_ARCO-geo.accesoPalcoFrontal.curvaPalco*Math.sin(Math.PI*u);
+  }
+  return {x:frente(z)+(ap.exterior.x-frente(ap.exterior.z))*(1-t),z:z};
+}
+function puntoMarco(p,t){
+  var borde=extremoMarco(p),curva=curvaturaMarco(t);
+  return {x:borde.x*(1-2*t),
+    y:P.pisos[3].y+(P.marcoEscenario.clave+p.y-P.pisos[3].y)*curva,
+    z:borde.z+(p.z-borde.z)*curva};
+}
+
+// Redondea la sección constructiva antes de barrerla a lo ancho del arco.
+// Las curvas comparten vértices y normales con las superficies contiguas;
+// no son tubos superpuestos sobre las antiguas esquinas cuadradas.
+function moldurasMarco(seccion,materiales,nombres,grupo){
+  var radio=0.065,pasos=12,perfil=[],duenos=[];
+  function mezcla(a,b,t){return {y:a.y+(b.y-a.y)*t,z:a.z+(b.z-a.z)*t};}
+  var puntos=seccion.map(function(p){return {y:p.y,z:p.z};});
+  perfil.push(puntos[0]);
+  function agrega(p,dueno){perfil.push(p);duenos.push(dueno);}
+  for(var k=1;k<puntos.length-1;k++){
+    var a=puntos[k-1],b=puntos[k],c=puntos[k+1];
+    // Conservar íntegra la franja de rombos y sus dos límites.
+    if(nombres[k-1]==='Franja burdeos inclinada'||nombres[k]==='Franja burdeos inclinada'){
+      agrega(b,k-1);continue;
+    }
+    var ab=Math.hypot(b.y-a.y,b.z-a.z),bc=Math.hypot(c.y-b.y,c.z-b.z);
+    var recorte=Math.min(radio,ab*0.3,bc*0.3);
+    var entrada=mezcla(b,a,recorte/ab),salida=mezcla(b,c,recorte/bc);
+    agrega(entrada,k-1);
+    for(var j=1;j<=pasos;j++){
+      var t=j/pasos;
+      agrega(mezcla(mezcla(entrada,b,t),mezcla(b,salida,t),t),j<=pasos/2?k-1:k);
+    }
+  }
+  agrega(puntos[puntos.length-1],puntos.length-2);
+  var n=96,ancho=perfil.length,pos=[],uv=[],idx=[],anteriores=[],distancias=[];
+  for(var i=0;i<=n;i++){
+    var t=i/n,distanciaV=0,anteriorV=null;
+    perfil.forEach(function(p,j){
+      var v=puntoMarco(p,t);pos.push(v.x,v.y,v.z);
+      function distancia(a,b){return Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);}
+      distancias[j]=(distancias[j]||0)+(anteriores[j]?distancia(v,anteriores[j]):0);
+      if(anteriorV)distanciaV+=distancia(v,anteriorV);
+      uv.push(distancias[j]/0.70,distanciaV/0.70);
+      anteriores[j]=v;anteriorV=v;
+    });
+  }
+  // Primero calcular las normales de toda la piel, sin cortes entre materiales.
+  for(i=0;i<n;i++)for(j=0;j<ancho-1;j++){
+    var v=i*ancho+j;idx.push(v,v+1,v+ancho,v+1,v+ancho+1,v+ancho);
+  }
+  var piel=new THREE.BufferGeometry();
+  piel.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  piel.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  piel.setIndex(idx);piel.computeVertexNormals();
+  materiales.forEach(function(mat,k){
+    var indices=[];
+    for(var i=0;i<n;i++)for(var j=0;j<duenos.length;j++)if(duenos[j]===k){
+      var v=i*ancho+j;indices.push(v,v+1,v+ancho,v+1,v+ancho+1,v+ancho);
+    }
+    var geometria=new THREE.BufferGeometry();
+    ['position','normal','uv'].forEach(function(attr){geometria.setAttribute(attr,piel.attributes[attr]);});
+    geometria.setIndex(indices);
+    var m=new THREE.Mesh(geometria,mat);m.name=nombres[k];grupo.add(m);
+  });
+  return perfil;
 }
 
 function embocadura(){
+  P.marcoEscenario.zInicio=apoyosMarco().interior.z+0.25;
   var g=new THREE.Group();
   var perfil=perfilArco();
 
@@ -552,7 +655,7 @@ function embocadura(){
   forma.closePath();
 
   var muro=new THREE.Mesh(new THREE.ExtrudeGeometry(forma,{depth:0.7,bevelEnabled:false}), MAT.muro);
-  muro.position.z=-0.35;
+  muro.position.z=P.marcoEscenario.zInicio-0.73;
   g.add(muro);
 
   // Alas en planta: desde la boca hacia el frente de los palcos. El
@@ -560,7 +663,9 @@ function embocadura(){
   var xEncuentro=limitesFrontal().xFrente+DESPLAZAMIENTO_FRONTAL_X;
   var avance=AVANCE_ALAS_EMBOCADURA;
   // El paseo consulta la misma sección que se construye aquí.
-  geo.embocadura={xEncuentro:xEncuentro,avance:avance,retiro:RETIRO_ESCENARIO_Z};
+  var apoyoAla=apoyosMarco(),largoAla=Math.hypot(xEncuentro-P.arcoA,avance);
+  var inicioAlaX=xEncuentro-P.marcoEscenario.anchoColumna*(xEncuentro-P.arcoA)/largoAla;
+  geo.embocadura={xEncuentro:xEncuentro,avance:avance,retiro:RETIRO_ESCENARIO_Z,xInicioAla:inicioAlaX};
   [-1,1].forEach(function(s){
     var puntos=[{x:s*P.arcoA,z:0},{x:s*xEncuentro,z:avance},
       {x:s*(P.jamba+1.0),z:avance}];
@@ -577,10 +682,15 @@ function embocadura(){
         });
         continue;
       }
-      var ala=new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(dx,dz),P.altura,0.7),MAT.muro);
-      ala.position.set((a.x+b.x)/2,P.altura/2,(a.z+b.z)/2);
+      // El ala baja termina donde empieza la columna estrecha. El tramo
+      // sobrante hacia la boca era el paño burdeos que quedó a la vista.
+      var ala=new THREE.Mesh(new THREE.BoxGeometry(P.marcoEscenario.anchoColumna,P.pisos[3].y,0.7),MAT.muro);
+      ala.position.set(s*apoyoAla.centro.x,P.pisos[3].y/2,apoyoAla.centro.z);
       ala.rotation.y=-Math.atan2(dz,dx);
       g.add(ala);
+      var dintelAla=new THREE.Mesh(new THREE.BoxGeometry(Math.hypot(dx,dz),P.altura-P.pisos[3].y,0.7),MAT.muro);
+      dintelAla.position.set((a.x+b.x)/2,(P.altura+P.pisos[3].y)/2,(a.z+b.z)/2);
+      dintelAla.rotation.y=ala.rotation.y;g.add(dintelAla);
     }
   });
 
@@ -594,20 +704,112 @@ function embocadura(){
   remate.position.set(0,P.altura+0.8,avance-0.4);
   g.add(remate);
 
-  // Gran paño curvo de lacería sobre la boca, como el granate con rombos
-  // de las fotografías. Las cintas de distinto avance generan relieve.
-  g.add(cintaArcoRebajado(1.02,1.52,0.38,MAT.embocaduraGeo));
-  [
-    {dy:0.02,h:0.16,z:0.48,m:MAT.oro},
-    {dy:0.28,h:0.18,z:0.51,m:MAT.embocaduraCrema},
-    {dy:0.54,h:0.13,z:0.54,m:MAT.oro},
-    {dy:1.78,h:0.16,z:0.50,m:MAT.oro}
-  ].forEach(function(b){g.add(cintaArcoRebajado(b.dy,b.h,b.z,b.m));});
+  g.name='Marco del escenario';
+  var cfg=P.marcoEscenario,seccion=[{y:0,z:cfg.zInicio}];
+  var sombraMarco=MAT.marcoRehundido;
+  var materialesMarco=[],nombresMarco=[];
+  function tramo(destino,material,nombre){
+    materialesMarco.push(material);nombresMarco.push(nombre);seccion.push(destino);
+  }
+  var yMarco=0,zMarco=cfg.zInicio;
+  cfg.escalones.forEach(function(alto,i){
+    // Cada tabica crema asciende; la huella oscura avanza hacia la sala.
+    yMarco+=alto;
+    tramo({y:yMarco,z:zMarco},MAT.marcoYeso,'Tabica inferior '+(i+1));
+    zMarco+=cfg.avanceEscalon;
+    tramo({y:yMarco,z:zMarco},sombraMarco,'Huella inferior '+(i+1));
+  });
+  var inicioFranja={y:yMarco,z:zMarco};
+  yMarco+=cfg.altoFranja;zMarco+=cfg.avanceFranja;
+  var granateMarco=MAT.marcoBurdeos;
+  tramo({y:yMarco,z:zMarco},granateMarco,'Franja burdeos inclinada');
+  // Una sola cadena de rombos grandes y pequeños, siguiendo la curva y
+  // la inclinación real del paño, en lugar de estirar un mosaico vertical.
+  var rombosPos=[],rombosIdx=[],rombosUV=[];
+  function romboMarco(t,ancho,alto){
+    var inicio=rombosPos.length/3;
+    [1,0.83].forEach(function(escala){
+      var esquinas=[[-ancho,0],[0,alto],[ancho,0],[0,-alto]];
+      for(var borde=0;borde<4;borde++)for(var paso=0;paso<8;paso++){
+        var a=esquinas[borde],b=esquinas[(borde+1)%4],f=paso/8;
+        var u=t+(a[0]+(b[0]-a[0])*f)*escala,v=0.5+(a[1]+(b[1]-a[1])*f)*escala;
+        var punto=puntoMarco({y:inicioFranja.y+v*cfg.altoFranja,z:inicioFranja.z+v*cfg.avanceFranja},u);
+        rombosPos.push(punto.x,punto.y,punto.z+0.025);
+        rombosUV.push(punto.x/0.7,punto.y/0.7);
+      }
+    });
+    for(var j=0;j<32;j++){
+      var k=(j+1)%32;rombosIdx.push(inicio+j,inicio+k,inicio+32+j,
+        inicio+k,inicio+32+k,inicio+32+j);
+    }
+  }
+  for(var diamante=0;diamante<15;diamante++){
+    romboMarco((diamante+0.5)/15,0.032,0.38);
+    if(diamante<14)romboMarco((diamante+1)/15,0.012,0.15);
+  }
+  var dibujo=new THREE.BufferGeometry();
+  dibujo.setAttribute('position',new THREE.Float32BufferAttribute(rombosPos,3));
+  dibujo.setAttribute('uv',new THREE.Float32BufferAttribute(rombosUV,2));
+  dibujo.setIndex(rombosIdx);dibujo.computeVertexNormals();
+  var laceria=new THREE.Mesh(dibujo,MAT.marcoYeso);
+  laceria.name='Rombos del marco';g.add(laceria);
+  var altoRemate=cfg.altoRemate;
+  var avanceRemate=(finalMarcoZ()-zMarco)/2;
+  for(var rem=0;rem<2;rem++){
+    yMarco+=altoRemate;
+    tramo({y:yMarco,z:zMarco},MAT.marcoYeso,'Tabica superior '+(rem+1));
+    zMarco+=avanceRemate;
+    tramo({y:yMarco,z:zMarco},sombraMarco,'Huella superior '+(rem+1));
+  }
+  var perfilSuave=moldurasMarco(seccion,materialesMarco,nombresMarco,g);
+  // La pared pintada ocupa la enjuta sobre el arco y remata exactamente
+  // en el final de los palcos. El marco no cambia al elevar el techo.
+  var anchoMural=2*extremoMarco(seccion[seccion.length-1]).x;
+  var altoPintura=anchoMural/P.muralEscenario.aspecto;
+  function cierreHastaTecho(linea,nombre){
+    var pos=[],idx=[],uv=[];
+    linea.forEach(function(p,i){
+      pos.push(p.x,p.y,p.z,p.x,P.altura,p.z);
+      // Proyección vertical única: el arco recorta la pintura por abajo
+      // sin estirar las figuras para adaptarlas a la curva.
+      var u=0.5+p.x/anchoMural;
+      uv.push(u,1-(P.altura-p.y)/altoPintura,u,1);
+      if(i){var a=2*(i-1);idx.push(a,a+1,a+2,a+1,a+3,a+2);}
+    });
+    var bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+    bg.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+    bg.setIndex(idx);bg.computeVertexNormals();
+    var m=new THREE.Mesh(bg,MAT.muralEscenario);m.name=nombre;g.add(m);
+    // Trasdós a 16 cm; el mural es una pared, no una lámina flotante.
+    var fondo=bg.clone(),p=fondo.attributes.position;
+    for(var i=0;i<p.count;i++)p.setZ(i,p.getZ(i)-0.16);
+    fondo.computeVertexNormals();g.add(new THREE.Mesh(fondo,MAT.muro));
+  }
+  [-1,1].forEach(function(s){
+    cierreHastaTecho(perfilSuave.map(function(p){return puntoMarco(p,s===1?0:1);}),
+      'Cierre lateral del marco '+s);
+  });
+  var ultimo=perfilSuave[perfilSuave.length-1],bordeFinal=[];
+  for(var i=0;i<=96;i++)bordeFinal.push(puntoMarco(ultimo,i/96));
+  cierreHastaTecho(bordeFinal,'Mural sobre el escenario');
+  var cornisaMural=new THREE.Mesh(new THREE.BoxGeometry(anchoMural,0.12,0.20),MAT.marcoYeso);
+  cornisaMural.position.set(0,P.altura-0.06,finalMarcoZ()-0.04);g.add(cornisaMural);
+  g.userData.alturaMarco=alturaMarco();
+  g.userData.zMural=finalMarcoZ()-RETIRO_ESCENARIO_Z;
+  g.userData.altoPintura=altoPintura;
+  [-1,1].forEach(function(s){
+    var luz=new THREE.SpotLight(0xffeed8,0.28,18,Math.PI/3,0.8,1);
+    luz.position.set(s*5.5,P.pisos[3].y+1,finalMarcoZ()+4.0);
+    luz.target.position.set(s*3,(alturaMarco()+P.altura)/2,finalMarcoZ());
+    g.add(luz);g.add(luz.target);
+  });
+  g.userData.seccionMarco=seccion;
+  g.userData.apoyosMarco=apoyosMarco();
 
   var cremaPilastra=MAT.estucoPilastra;
-  var panelPilastra=MAT.estucoPilastra.clone(); panelPilastra.color.setHex(0x777166);
-  var marcoPilastra=new THREE.MeshLambertMaterial({color:0x48453d});
-  var relievePilastra=MAT.estucoPilastra.clone(); relievePilastra.color.setHex(0xaaa397);
+  var panelPilastra=MAT.estucoPilastra.clone(); panelPilastra.color.setHex(0x9b8970);
+  var marcoPilastra=MAT.marcoRehundido;
+  var relievePilastra=MAT.estucoPilastra.clone(); relievePilastra.color.setHex(0xd0bda0);
   var piedraPilastra=MAT.piedraPilastra;
   // Cada pilastra completa sigue el ala diagonal. Su eje vertical se
   // conserva; el giro es en planta, con base, panel y capitel solidarios.
@@ -659,6 +861,29 @@ function embocadura(){
       }
     });
     cadena.instanceMatrix.needsUpdate=true;lateral.add(cadena);
+    // Segunda cenefa de rombos finos en relieve: el panel central queda
+    // liso, enmarcado por la lacería crema que se aprecia en la foto.
+    var rombo=new THREE.Shape();
+    rombo.moveTo(0,0.10);rombo.lineTo(0.044,0);rombo.lineTo(0,-0.10);
+    rombo.lineTo(-0.044,0);rombo.closePath();
+    var vacio=new THREE.Path();
+    vacio.moveTo(0,0.072);vacio.lineTo(-0.029,0);vacio.lineTo(0,-0.072);
+    vacio.lineTo(0.029,0);vacio.closePath();rombo.holes.push(vacio);
+    var cenefa=new THREE.InstancedMesh(new THREE.ExtrudeGeometry(rombo,
+      {depth:0.008,bevelEnabled:false}),relievePilastra,64);
+    var mRombo=new THREE.Matrix4(),ir=0;
+    [-1,1].forEach(function(lado){
+      for(var r=0;r<28;r++){
+        mRombo.makeTranslation(x+lado*0.307,1.55+r*0.20,0.70);
+        cenefa.setMatrixAt(ir++,mRombo);
+      }
+      for(var r=0;r<4;r++){
+        mRombo.makeRotationZ(Math.PI/2);
+        mRombo.setPosition(x+(r-1.5)*0.15,4.25+lado*2.90,0.70);
+        cenefa.setMatrixAt(ir++,mRombo);
+      }
+    });
+    cenefa.instanceMatrix.needsUpdate=true;lateral.add(cenefa);
     marco(1.46,0.065,0.84,0.63,0.02,marcoPilastra);
     [
       {y:7.72,w:1.62,h:0.22,d:0.68},
@@ -668,6 +893,19 @@ function embocadura(){
       var cap=new THREE.Mesh(new THREE.BoxGeometry(c.w,c.h,c.d),cremaPilastra);
       cap.position.set(x,c.y,0.30); lateral.add(cap);
     });
+    // Friso de pequeños arcos de herradura bajo la cornisa del capitel.
+    var friso=new THREE.Mesh(new THREE.BoxGeometry(1.62,0.42,0.10),cremaPilastra);
+    friso.position.set(x,7.65,0.73);lateral.add(friso);
+    for(var arco=0;arco<7;arco++){
+      var puntosArco=[];
+      for(var paso=0;paso<=24;paso++){
+        var ang=-Math.PI*0.22+paso/24*Math.PI*1.44;
+        puntosArco.push(new THREE.Vector3(x+(arco-3)*0.22+0.085*Math.cos(ang),
+          7.63+0.145*Math.sin(ang),0.793));
+      }
+      var aro=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(puntosArco),24,0.014,5,false),marcoPilastra);
+      lateral.add(aro);
+    }
     /* La jamba no lleva filete vertical. Eran tres bandas heredadas de la
        pilastra anterior —dos de oro y una de crema—, colocadas todavía en
        el sistema viejo (s*dx, no x=s*0,78 como el resto de la pieza). Las
@@ -677,8 +915,20 @@ function embocadura(){
        columna. El fuste y sus marcos concéntricos ya la resuelven. */
     // El basamento nace sobre las tablas; la coronación conserva su
     // encuentro con el arco superior al ajustar la altura de la pilastra.
-    lateral.position.set(s*P.arcoA,geo.escenario.altura,0);
-    lateral.scale.y=(8.43-geo.escenario.altura)/8.43;
+    var apoyo=apoyosMarco();
+    lateral.scale.x=apoyo.escala;
+    lateral.scale.y=(P.pisos[3].y-geo.escenario.altura)/8.43;
+    var giro=-s*Math.atan2(avance,xEncuentro-P.arcoA);
+    var centroLocal=x*lateral.scale.x;
+    lateral.position.set(s*apoyo.centro.x-Math.cos(giro)*centroLocal,
+      geo.escenario.altura,apoyo.centro.z+Math.sin(giro)*centroLocal);
+    lateral.userData.anchoFuste=cfg.anchoColumna;
+    lateral.name='Pilastra de embocadura '+s;
+    // Retorno hasta el testero del palco: comparte su extremo z, no
+    // depende del ancho ornamental del panel de la pilastra.
+    var union=new THREE.Mesh(new THREE.BoxGeometry(0.50,P.pisos[3].y-geo.escenario.altura,0.90),cremaPilastra);
+    union.position.set(s*xEncuentro,(P.pisos[3].y+geo.escenario.altura)/2,avance);
+    union.name='Encuentro pilastra palco '+s;g.add(union);
     // Proyección por metros en cada cara: una misma densidad de grano
     // en el fuste alto, sus molduras y el basamento, sin estiramientos.
     lateral.traverse(function(malla){
@@ -693,7 +943,7 @@ function embocadura(){
       }
       uv.needsUpdate=true;
     });
-    lateral.rotation.y=-s*Math.atan2(avance,xEncuentro-P.arcoA);
+    lateral.rotation.y=giro;
     g.add(lateral);
   });
   // La embocadura acompaña al escenario retirado para que el arco de
@@ -719,11 +969,20 @@ function juegoTelon(g, z, anchoBamba, altoPata, anchoPata, xPata, altoBamba){
   g.add(cortina(perfilBamba, altoPata-0.4, altoPata-0.4+altoBamba, MAT.telon, 1));
 }
 
-/* ---------------- TELÓN DE BOCA FUNCIONAL (se abre y se cierra) ---
-   Dos paños que cuelgan recogidos junto a las patas del primer juego
-   y se deslizan hasta juntarse en el centro. La geometría del pliegue
-   no cambia; solo se traslada en x, así que animar es barato. */
-var TELON_ANCHO=8.4, TELON_ALTO=10.3, TELON_Z=-0.9, TELON_X_ABIERTO=7.1;
+/* ---------------- TELÓN DE BOCA FUNCIONAL (sube y baja) -----------
+   El del Falla es un telón de guillotina: un paño único que cae desde
+   la percha y se recoge hacia arriba. No son dos hojas que se separen
+   hacia los lados.
+
+   Se recoge escalando el paño en y contra su borde superior, no
+   trasladándolo. Trasladarlo sería lo que hace un telón real, pero
+   subiría 7,7 m y el paño acabaría atravesando el techo de la caja
+   escénica, que está a 12 m. Escalando, la tela nunca sale de la caja
+   y desde la sala se ve exactamente lo mismo: el bajo que sube. La
+   contrapartida es que la trama se comprime al recogerse, y por eso el
+   recorrido termina en cuanto el bajo se esconde tras la bambalina. */
+var TELON_ANCHO=16.8, TELON_ALTO=10.3;
+function planoTelonZ(){return apoyosMarco().interior.z;}
 var TELON_DURACION=3.0; // segundos que tarda en abrir/cerrar del todo
 
 /* Pliegue del telón de boca. Los valores anteriores —5 periodos y 0,76 m
@@ -731,14 +990,8 @@ var TELON_DURACION=3.0; // segundos que tarda en abrir/cerrar del todo
    de cresta a valle: chapa ondulada, no terciopelo. En la fotografía de
    referencia se cuentan unos treinta pliegues en los quince metros de
    boca, de unos diez centímetros de fondo. */
-var TELON_PLIEGUES=9;      // periodos de pliegue del paño derecho
-var TELON_PLIEGUES_I=10;   /* y del izquierdo: distinto, para romper el espejo.
-                              Con 9,5 los dos paños solo divergian un 30% del
-                              fondo del pliegue en los tres metros centrales,
-                              que es la zona que se mira de frente; con 10 son
-                              el 51%, a cambio de un 11% mas de densidad en esa
-                              hoja, que se lee como variacion natural. */
-var TELON_PROF=0.115;      // profundidad del pliegue, m
+var TELON_PLIEGUES=32;      // periodos de pliegue en los 16,8 m del paño
+var TELON_PROF=0.085;      // profundidad del pliegue, m
 var TELON_SEG=10;          // segmentos por periodo
 var TELON_FILAS=22;        // filas de vértices en vertical
 var TELON_APRIETE=0.72;    // el pliegue se pinza contra la barra
@@ -752,76 +1005,94 @@ var TELON_REP_V=4;
    0 es abierto del todo y 1 cerrado; ambas variables parten del mismo
    valor para que la escena no se abra sola en el primer fotograma. */
 var TELON_INICIAL=1;
-var telonDer=null, telonIzq=null,
+var telonPano=null, telonBaseY=0, telonEscalaAbierto=1,
     telonProgreso=TELON_INICIAL, telonObjetivo=TELON_INICIAL;
 
-/* Los dos paños no pueden compartir perfil. Reflejar uno en el otro
-   —que es lo que hacía antes— produce una simetría especular perfecta
-   respecto del centro de la boca, y el ojo la lee como papel pintado en
-   cuanto se mira el telón de frente. Cada paño recibe su propio número
-   de pliegues y su propio armónico, pero ambos arrancan con z=0 en el
-   eje: así los perfiles difieren en toda su longitud y aun así las dos
-   hojas casan sin escalón donde se encuentran. */
-function perfilMedioTelon(ancho, pliegues, profundidad, segPorPliegue, armonico){
+/* Perfil del paño, centrado en el eje de la boca. */
+function perfilTelon(ancho, pliegues, profundidad, segPorPliegue, armonico){
   var n=Math.max(1,Math.round(pliegues*segPorPliegue)), pts=[], i;
   for(i=0;i<=n;i++){
     var t=i/n, a=t*pliegues*Math.PI*2;
     /* Segunda armónica inconmensurable con la primera: un seno puro se
-       reconoce al instante como una función. Sin desfase, para que el
-       borde interior del paño quede exactamente en el plano medio.
-       Se normaliza por 1,28 para conservar la profundidad pedida. */
-    var z=(Math.sin(a)+0.28*Math.sin(a*(armonico||2.37)))/1.28*profundidad;
-    pts.push({x:t*ancho, z:z});
+       reconoce al instante como una función, y en un paño único de casi
+       diecisiete metros la regularidad canta mucho más que en dos hojas
+       cortas. Se normaliza por 1,12 para conservar la profundidad. */
+    var z=(Math.sin(a)+0.12*Math.sin(a*(armonico||2.37)))/1.12*profundidad;
+    pts.push({x:(t-0.5)*ancho, z:z});
   }
   return pts;
 }
 
 function construirTelonFuncional(g){
-  /* El bajo del paño queda a y=0, un metro por debajo de la tarima, de
-     modo que su borde inferior no se ve nunca y no necesita comba. La
-     bambalina sí la lleva: su borde sí queda a la vista. */
+  // La tela alcanza las tablas, con un bajo ligeramente irregular.
+  // La bambalina no se mueve: el paño se recoge por detrás de ella.
   var op={filas:TELON_FILAS, apriete:TELON_APRIETE,
-          sombra:{pliegue:0.42, pie:0.70}};
-  var perfilD=perfilMedioTelon(TELON_ANCHO,TELON_PLIEGUES,TELON_PROF,TELON_SEG,2.37)
-    .map(function(p){ return {x:p.x, z:TELON_Z+p.z}; });
-  var perfilI=perfilMedioTelon(TELON_ANCHO,TELON_PLIEGUES_I,TELON_PROF,TELON_SEG,3.11)
-    .map(function(p){ return {x:-p.x, z:TELON_Z+p.z}; });
-  telonDer=cortina(perfilD, 0, TELON_ALTO, MAT.telon, TELON_REP_V, op);
-  telonIzq=cortina(perfilI, 0, TELON_ALTO, MAT.telon, TELON_REP_V, op);
-  // La posición de partida se deriva del progreso, no se fija aparte:
-  // así cambiar TELON_INICIAL basta y las dos no pueden discrepar.
-  var xInicial=TELON_X_ABIERTO*(1-suaveT(telonProgreso));
-  telonDer.position.x=xInicial;
-  telonIzq.position.x=-xInicial;
-  g.add(telonDer, telonIzq);
+          comba:0.018,sombra:{pliegue:0.34, pie:0.88}};
+  var perfil=perfilTelon(TELON_ANCHO,TELON_PLIEGUES,TELON_PROF,TELON_SEG,2.37)
+    .map(function(p){ return {x:p.x, z:planoTelonZ()+p.z}; });
+  telonBaseY=geo.escenario.altura+0.015;
+  telonPano=cortina(perfil, telonBaseY, TELON_ALTO, MAT.telon, TELON_REP_V, op);
+  telonPano.name='Telón de boca';
+  // La proyección comparte los vértices del paño: sigue sus pliegues y
+  // su recogida vertical. El PNG transparente evita un rectángulo de fondo.
+  var geoMonograma=telonPano.geometry.clone();
+  var posiciones=geoMonograma.attributes.position,uvLogo=geoMonograma.attributes.uv;
+  var ladoLogo=3.0,centroLogoY=6.20;
+  for(var il=0;il<posiciones.count;il++){
+    uvLogo.setXY(il,posiciones.getX(il)/ladoLogo+0.5,
+      (posiciones.getY(il)-centroLogoY)/ladoLogo+0.5);
+  }
+  uvLogo.needsUpdate=true;
+  var monograma=new THREE.Mesh(geoMonograma,MAT.monogramaTelon);
+  monograma.name='proyeccionMonogramaTelon';
+  monograma.renderOrder=1;
+  telonPano.add(monograma);
+  /* Escala mínima: aquélla con la que el bajo del paño queda justo por
+     encima del borde inferior de la bambalina —comba incluida—, de modo
+     que al recogerse del todo desaparece detrás de ella y no se ve un
+     canto de tela colgando sobre la boca. Se despeja de
+     bajo = s*telonBaseY + TELON_ALTO*(1-s). */
+  var bajoRecogido=TELON_ALTO-BAMBA_ALTO+0.10;
+  telonEscalaAbierto=Math.max(0.02,
+    (TELON_ALTO-bajoRecogido)/(TELON_ALTO-telonBaseY));
+  g.add(telonPano);
   g.add(bambalinaTelon());
+  // La postura de partida sale del progreso, no se fija aparte: así
+  // cambiar TELON_INICIAL basta y las dos no pueden discrepar.
+  aplicaTelon();
+}
+
+/* Coloca el paño según telonProgreso: 1 abajo, 0 recogido. Escalar en y
+   deja el borde superior clavado en TELON_ALTO, que es de donde cuelga. */
+function aplicaTelon(){
+  if(!telonPano) return;
+  var s=telonEscalaAbierto+(1-telonEscalaAbierto)*suaveT(telonProgreso);
+  telonPano.scale.y=s;
+  telonPano.position.y=TELON_ALTO*(1-s);
 }
 
 /* ---- Bambalina del telón de boca ----------------------------------
    Banda plisada fija que corona la boca. Va medio palmo por delante de
    los paños, de modo que al abrirse éstos pasan por detrás sin rozarla.
-   Su borde inferior sí se ve —al contrario que el bajo de los paños,
-   enterrado bajo la tarima—, y por eso lleva comba: un canto recto
-   delata la extrusión al instante. */
-var BAMBA_ANCHO=17.6, BAMBA_ALTO=2.15, BAMBA_PLIEGUES=18, BAMBA_PROF=0.085;
+   El borde inferior lleva una comba discreta por pliegue, como la
+   caída corta y casi recta de la referencia. */
+var BAMBA_ANCHO=17.6, BAMBA_ALTO=1.65, BAMBA_PLIEGUES=34, BAMBA_PROF=0.085;
 
 function bambalinaTelon(){
   var perfil=perfilCortina(BAMBA_ANCHO, BAMBA_PLIEGUES, BAMBA_PROF, 8)
-    .map(function(p){ return {x:p.x, z:TELON_Z+0.16+p.z}; });
+    .map(function(p){ return {x:p.x, z:planoTelonZ()+0.16+p.z}; });
   return cortina(perfil, TELON_ALTO-BAMBA_ALTO, TELON_ALTO, MAT.telon, 1.1,
-    {filas:8, apriete:0.80, comba:0.13, sombra:{pliegue:0.38, pie:0.84}});
+    {filas:8, apriete:0.80, comba:0.045, sombra:{pliegue:0.34, pie:0.80}});
 }
 
 function suaveT(t){ return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
 
 function actualizarTelon(dt){
-  if(!telonDer) return;
+  if(!telonPano) return;
   var paso=dt/TELON_DURACION;
   if(telonProgreso<telonObjetivo) telonProgreso=Math.min(telonObjetivo, telonProgreso+paso);
   else if(telonProgreso>telonObjetivo) telonProgreso=Math.max(telonObjetivo, telonProgreso-paso);
-  var x=TELON_X_ABIERTO*(1-suaveT(telonProgreso));
-  telonDer.position.x=x;
-  telonIzq.position.x=-x;
+  aplicaTelon();
 }
 
 function alternarTelon(){
@@ -855,24 +1126,29 @@ function escenario(){
     var curva=new THREE.CatmullRomCurve3(frente.map(function(p){return new THREE.Vector3(p.x,y,p.z+0.012);}));
     g.add(new THREE.Mesh(new THREE.TubeGeometry(curva,64,0.018,6,false),MAT.maderaPlatea));
   });
-  var fondo=new THREE.Mesh(new THREE.PlaneGeometry(19,12), MAT.hueco);
-  fondo.position.set(0,6,-15.9); g.add(fondo);
+  var fondo=new THREE.Mesh(new THREE.PlaneGeometry(19,P.altura), MAT.hueco);
+  fondo.position.set(0,P.altura/2,-15.9); g.add(fondo);
 
   /* Caja escénica cerrada. Tarima, fondo y telones no formaban volumen:
      por encima de la bambalina más alta y por los dos costados se veía
      el exterior desde el patio. Se cierra con el mismo negro del fondo y
-     a su misma medida (19 m de ancho, 12 m de alto), así que a la vista
+     a su misma medida (19 m de ancho y la altura del teatro), así que a la vista
      no cambia nada —sigue siendo oscuridad— salvo que ya no hay por
      dónde escaparse. Los paños quedan 50 cm por fuera de la tarima y muy
-     por fuera de la luz del arco (P.arcoA = 7,50), de modo que desde la
-     sala no asoman. La boca llega a z=2,5 en coordenadas del grupo, que
-     es el z=0 de la sala: empalma con el muro frontal sin junta. */
-  var mitadCaja=9.5, altoCaja=12, zBocaCaja=2.5, zFondoCaja=-15.9;
+     por fuera de la luz del arco (P.arcoA = 7,50). Los laterales terminan
+     dentro del ala transversal de la embocadura, en el inicio del palco;
+     el techo sí continúa hasta z=0 para cerrar la coronación. */
+  // El antiguo techo a 12 m atravesaba la franja inclinada de rombos.
+  // Caja y coronación comparten la cota final, también al redimensionar.
+  var mitadCaja=9.5, altoCaja=P.altura, zBocaCaja=RETIRO_ESCENARIO_Z, zFondoCaja=-15.9;
   var largoCaja=zBocaCaja-zFondoCaja, zCentroCaja=(zBocaCaja+zFondoCaja)/2;
-  var paredCaja=new THREE.PlaneGeometry(largoCaja, altoCaja-geo.foso.altura);
+  // Compartir la profundidad del techo prolongaba la pared hasta z=0,
+  // atravesando los tres palcos (que comienzan en z=-1) con un paño oscuro.
+  var zBocaLaterales=geo.frenteEscenico.zInicioPalcos+RETIRO_ESCENARIO_Z;
+  var paredCaja=new THREE.PlaneGeometry(zBocaLaterales-zFondoCaja, altoCaja-geo.foso.altura);
   [-1,1].forEach(function(sc){
     var m=new THREE.Mesh(paredCaja, MAT.hueco);
-    m.position.set(sc*mitadCaja,(altoCaja+geo.foso.altura)/2,zCentroCaja);
+    m.position.set(sc*mitadCaja,(altoCaja+geo.foso.altura)/2,(zBocaLaterales+zFondoCaja)/2);
     m.rotation.y=-sc*Math.PI/2;   // la cara vista mira hacia dentro
     g.add(m);
   });
@@ -1192,6 +1468,7 @@ function texturaTecho(){
   return new THREE.CanvasTexture(c);
 }
 
+function alturaLampara(){return P.altura-3.0;}
 function lampara(){
   var g=new THREE.Group();
   var aro=new THREE.Mesh(new THREE.TorusGeometry(1.5,0.07,6,32), MAT.oro);
@@ -1205,8 +1482,9 @@ function lampara(){
     var b=new THREE.Mesh(new THREE.SphereGeometry(0.11,6,6), luzMat);
     b.position.set(Math.cos(a)*r, y+0.12, Math.sin(a)*r); g.add(b);
   }
-  var cable=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,2.2,5), MAT.oro);
-  cable.position.y=1.4; g.add(cable);
+  var largoCable=P.altura-alturaLampara()-0.3;
+  var cable=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,largoCable,5), MAT.oro);
+  cable.position.y=0.3+largoCable/2; g.add(cable);
   return g;
 }
 
@@ -2256,6 +2534,59 @@ function fondoTecnicoPlatea(escena){
 /* Portada del palco frontal, colocada en el plano vertical de su
    barandilla. El vano es casi rectangular: jambas largas y un arco muy
    rebajado bajo un paño superior continuo, como en la sala histórica. */
+/* Subdivisión de las piezas rectas del remate: el combado trabaja sobre
+   vértices, y una arista con sólo sus dos extremos sale como cuerda. */
+var SEG_ARISTA_ARCO=24;
+
+/* Retranqueo del arco respecto al frente del palco. Mientras el arco era
+   un plano en la cuerda quedaba hasta 42 cm por detrás del borde curvo y
+   nada podía tocarlo. Al combarlo pasa a seguir esa misma curva, y
+   entonces el faldón de madera del palco de encima —que va justo en el
+   borde— cae dentro del espesor del paño y asoma por su cara vista. Diez
+   centímetros bastan para que el conjunto vuelva a quedar detrás, sin
+   dejar de acompañar la curva. */
+var RETRANQUEO_ARCO=0.12;
+
+/* Bombeo del frente del palco en una posición del vano. xLocal recorre
+   el eje del arco y el seno es simétrico, así que vale para los dos
+   flancos. Sale de curvaPalco, la misma que dibuja bF y usa la colisión. */
+function flechaFrentePalco(xLocal,luz){
+  var t=Math.max(0,Math.min(1,0.5+xLocal/luz));
+  return geo.accesoPalcoFrontal.curvaPalco*Math.sin(Math.PI*t);
+}
+
+/* Comba el conjunto del arco contra el frente curvo del palco.
+
+   La flecha es la misma a cualquier altura, sin degradar. Sólo así la
+   arista inferior queda paralela a la superior y la banda entera
+   describe una curvatura a un mismo nivel: un degradado en altura
+   —arriba curvo, abajo recto— deja el paño alabeado, con las dos
+   aristas divergiendo hasta 42 cm.
+
+   La consecuencia es que el vano también se barre a lo largo de la
+   curva. No hay alternativa: dos aristas sólo pueden ser paralelas si
+   todo lo que hay entre ellas se desplaza lo mismo.
+
+   Se comba después de montar el conjunto, a nivel de vértice, para que
+   conserven la curva las jambas, el paño extruido, los tres tubos y la
+   cornisa sin rehacer cada pieza. El eje local Z apunta hacia la sala en
+   los dos flancos —la rotación es de signo opuesto—, así que la flecha
+   se suma igual en ambos. */
+function combaArcoAlFrentePalco(grupo,luz){
+  grupo.traverse(function(o){
+    if(!o.isMesh || o.isInstancedMesh) return;
+    var pos=o.geometry.getAttribute('position');
+    if(!pos) return;
+    for(var i=0;i<pos.count;i++){
+      // El vértice está en coordenadas de su malla; el eje del arco es
+      // el del grupo, de ahí que se sume el desplazamiento de la pieza.
+      pos.setZ(i,pos.getZ(i)+flechaFrentePalco(pos.getX(i)+o.position.x,luz));
+    }
+    pos.needsUpdate=true;
+    o.geometry.computeVertexNormals();   // si no, se ilumina como plano
+  });
+}
+
 function arcoPalcoFrontal(escena,signo,x,zInicio,zFin,yBarandilla,yTecho,materialJamba){
   var ancho=zFin-zInicio-0.16,alto=yTecho-yBarandilla;
   if(ancho<=0.4 || alto<=0.45)return;
@@ -2272,7 +2603,7 @@ function arcoPalcoFrontal(escena,signo,x,zInicio,zFin,yBarandilla,yTecho,materia
   );
   // Jambas rectas, anchas y continuas desde la barandilla.
   [-1,1].forEach(function(lado){
-    var jamba=new THREE.Mesh(new THREE.BoxGeometry(margenJamba,alto,0.12),materialJamba||MAT.mudejarArcos);
+    var jamba=new THREE.Mesh(new THREE.BoxGeometry(margenJamba,alto,0.12,4,1,1),materialJamba||MAT.mudejarArcos);
     jamba.position.set(lado*(ancho/2-margenJamba/2),alto/2,0);grupo.add(jamba);
     var filete=new THREE.Mesh(new THREE.BoxGeometry(0.030,yArranque,0.142),MAT.oro);
     filete.position.set(lado*(luz/2+0.026),yArranque/2,-0.004);grupo.add(filete);
@@ -2284,7 +2615,10 @@ function arcoPalcoFrontal(escena,signo,x,zInicio,zFin,yBarandilla,yTecho,materia
   paño.lineTo(ptsArco[0].x,ptsArco[0].y);
   for(var ip=1;ip<ptsArco.length;ip++)paño.lineTo(ptsArco[ip].x,ptsArco[ip].y);
   paño.lineTo(ancho/2,yArranque);
-  paño.lineTo(ancho/2,alto);paño.lineTo(-ancho/2,alto);paño.closePath();
+  paño.lineTo(ancho/2,alto);
+  for(var ic=1;ic<=SEG_ARISTA_ARCO;ic++)
+    paño.lineTo(ancho/2-ancho*ic/SEG_ARISTA_ARCO,alto);
+  paño.closePath();
   var geoPaño=new THREE.ExtrudeGeometry(paño,{
     depth:0.11,bevelEnabled:true,bevelThickness:0.012,bevelSize:0.012,bevelSegments:1
   });
@@ -2307,13 +2641,18 @@ function arcoPalcoFrontal(escena,signo,x,zInicio,zFin,yBarandilla,yTecho,materia
     new THREE.Vector3(0,0,1),Math.PI),escala=new THREE.Vector3(1,1,1);
   for(var id=0;id<nDientes;id++){
     var pd=curva.getPoint((id+0.5)/nDientes);
-    matriz.compose(new THREE.Vector3(pd.x,pd.y-0.075,0.078),quat,escala);
+    // Los dientes son InstancedMesh: su combado va en la matriz, que es
+    // donde vive su posición, y no en los vértices del cono.
+    matriz.compose(new THREE.Vector3(pd.x,pd.y-0.075,
+      0.078+flechaFrentePalco(pd.x,zFin-zInicio)),quat,escala);
     dientes.setMatrixAt(id,matriz);
   }
   dientes.instanceMatrix.needsUpdate=true;grupo.add(dientes);
-  var cornisa=new THREE.Mesh(new THREE.BoxGeometry(ancho+0.10,0.10,0.15),MAT.mudejarArcos);
+  var cornisa=new THREE.Mesh(
+    new THREE.BoxGeometry(ancho+0.10,0.10,0.15,SEG_ARISTA_ARCO,1,1),MAT.mudejarArcos);
   cornisa.position.set(0,alto-0.05,0);grupo.add(cornisa);
-  grupo.position.set(x,yBarandilla,(zInicio+zFin)/2);
+  combaArcoAlFrentePalco(grupo,zFin-zInicio);
+  grupo.position.set(x+signo*RETRANQUEO_ARCO,yBarandilla,(zInicio+zFin)/2);
   grupo.rotation.y=-signo*Math.PI/2;
   escena.add(grupo);
 }
@@ -2335,7 +2674,7 @@ function uneContornoAPared(contorno,xPared,zEncuentro){
   var pI=cruce(contorno[iI],contorno[iI+1]);
   var desplazamientoD=pD.x-xPared;
   var desplazamientoI=pI.x+xPared;
-  var zRecupera=zEncuentro+4.60;
+  var zRecupera=zEncuentro+VUELTA_PROSCENIO_Z;
   var cuerpo=contorno.slice(iD,iI+1).map(function(p){
     var t=Math.max(0,Math.min(1,(p.z-zEncuentro)/(zRecupera-zEncuentro)));
     t=t*t*(3-2*t);
@@ -2354,10 +2693,15 @@ function uneContornoAPared(contorno,xPared,zEncuentro){
    sillasPalco() un índice real en el que centrar el grupo de sillas.
    limitesFrontal() aparta el fondo del muro real (ver su comentario: un
    fondo fijo al ancho de la jamba quedaría oculto detrás del muro). */
-function palcosFrontales(escena, alturaFrontal, alturaBarandilla, altoPiso, sillaGeo, yBase){
+function palcosFrontales(escena, alturaFrontal, alturaBarandilla, altoPiso, sillaGeo, yBase, nivel){
   var limFrontal=limitesFrontal(), yFrontal=function(){return alturaFrontal;};
-  var esPlatea=alturaFrontal<P.pisos[1].y-1;
-  var yTecho=esPlatea?P.pisos[1].y:P.pisos[2].y;
+  /* El nivel se recibe, no se deduce. Antes salía de comparar la cota
+     contra el forjado del principal, que sólo sabía distinguir platea de
+     "lo de arriba": con tres palcos apilados esa prueba ya no basta, y
+     el techo de cada uno es el forjado del piso siguiente. */
+  nivel=nivel||0;
+  var esPlatea=nivel===0;
+  var yTecho=nivel===1?COTA_BAJO_SEGUNDO:P.pisos[nivel+1].y;
   [-1,1].forEach(function(signo){
     var zInicio=geo.frenteEscenico.zInicioPalcos;
     var xFondo=signo*(limFrontal.xFondo+DESPLAZAMIENTO_FRONTAL_X), xFrente=signo*(limFrontal.xFrente+DESPLAZAMIENTO_FRONTAL_X);
@@ -2366,7 +2710,7 @@ function palcosFrontales(escena, alturaFrontal, alturaBarandilla, altoPiso, sill
       var tb=ib/muestras,zB=zInicio+(Z_CORREDOR_INI-zInicio)*tb;
       // Los extremos permanecen anclados; el centro avanza 42 cm hacia
       // la sala y produce el frente convexo de los palcos históricos.
-      bF.push({x:xFrente-signo*0.42*Math.sin(Math.PI*tb),z:zB});
+      bF.push({x:xFrente-signo*geo.accesoPalcoFrontal.curvaPalco*Math.sin(Math.PI*tb),z:zB});
       plF.push({x:xFondo,z:zB});
     }
     /* Base cerrada del palco: frente, trasera y testeros bajan hasta
@@ -2381,7 +2725,7 @@ function palcosFrontales(escena, alturaFrontal, alturaBarandilla, altoPiso, sill
     escena.add(banda(bF, plF, yBase, yBase, MAT.yeso));   // intradós
     barandillaPalco(escena, bF, yFrontal, alturaBarandilla);
     VALLAS_FRONTALES.push({linea:bF,y:alturaFrontal,alto:alturaBarandilla,
-      xFondo:xFondo,nivel:esPlatea?0:1});
+      xFondo:xFondo,nivel:nivel});
     /* Techo del palco, 5 mm por debajo del forjado que lo cubre. El del
        principal es ahora el propio suelo de la balconada, que pasa por
        encima a la cota exacta del piso: sin ese rehundido las dos tapas
@@ -2791,10 +3135,14 @@ function construir(escena){
     var planPiso=geo.PLAN;
     var borde = geo.dentro(planPiso, piso.dentro);
     if(n===1){
-      // Los palcos de proscenio se adelantan hasta la línea del palco
-      // frontal. El modo paseo decide por contorno, no por la geometría
-      // dibujada, así que tiene que recibir exactamente el mismo.
-      borde=adelantaPalcosProscenio(borde, piso.palcosLado);
+      // Igual que en el segundo piso, se transforman las dos caras de la
+      // losa. Antes sólo se curvaba el borde interior y PLAN permanecía
+      // en la herradura original, creando una cuña torcida en la unión.
+      var limPrincipal=limitesFrontal();
+      borde=adelantaPalcosProscenio(borde,
+        limPrincipal.xFrente+DESPLAZAMIENTO_FRONTAL_X);
+      planPiso=adelantaPalcosProscenio(planPiso,
+        limPrincipal.xFondo+DESPLAZAMIENTO_FRONTAL_X);
       geo.fijaBordeNivel(n, borde);
     }
     if(n===2){
@@ -2837,7 +3185,7 @@ function construir(escena){
       if(!sillaPalcoGeo) sillaPalcoGeo = construirSillaPalco();
 
       palcosFrontales(escena, ALTURA_FRONTAL, ALTURA_BARANDILLA, piso.alto, sillaPalcoGeo,
-        function(p){return geo.rake(p.z);});
+        function(p){return geo.rake(p.z);}, 0);
 
       // El ala en sí (peana+barandilla+suelo+moldura continuos, y dentro,
       // los 8 palcos tabicados con sus sillas), de iAla a corte y de
@@ -2934,19 +3282,39 @@ function construir(escena){
       }
       var bordeAnillo=borde.slice(iFrontalD,iFrontalI+1);
       var planAnillo=planPiso.slice(iFrontalD,iFrontalI+1);
+      /* El segundo piso repite el hueco, pero sus índices no son los de
+         geo.PLAN: uneContornoAPared() remuestrea `borde`, así que el
+         corte se busca sobre el propio array que se va a cortar. Se
+         guardan además los índices en el espacio de PLAN, que es el que
+         usan corredor y antepalcos. */
+      var iFrontalBorde=0, iFrontalBordeI=borde.length-1;
+      var iFrontalPlan=0, iFrontalPlanI=geo.PLAN.length-1;
+      if(n===NIVEL_ANFI){
+        for(var ifb=0; ifb<borde.length; ifb++){
+          if(borde[ifb].z>=Z_CORREDOR_INI){ iFrontalBorde=ifb; break; }
+        }
+        iFrontalBordeI=borde.length-1-iFrontalBorde;
+        for(var ifp=0; ifp<geo.PLAN.length; ifp++){
+          if(geo.PLAN[ifp].z>=Z_CORREDOR_INI){ iFrontalPlan=ifp; break; }
+        }
+        iFrontalPlanI=geo.PLAN.length-1-iFrontalPlan;
+        // Mismo remiendo de cuña que en el principal, y aquí más
+        // necesario: dentro() desplaza 2,70 m en vez de 2,10.
+        bordeAnillo=[{x:borde[iFrontalBorde].x,z:Z_CORREDOR_INI}].concat(
+          borde.slice(iFrontalBorde,iFrontalBordeI+1),
+          [{x:borde[iFrontalBordeI].x,z:Z_CORREDOR_INI}]);
+      }
       if(n===1){
-        /* iFrontalD se elige sobre la planta, pero el borde interior lo
-           produce dentro(), que desplaza cada punto por su normal: junto
-           a la embocadura esa normal tiene mucha componente en z, así que
-           el primer punto del anillo cae en z=2,67 mientras el palco
-           frontal termina en z=1,80. Valla y canto arrancaban ahí y
-           dejaban una cuña de 87 cm de suelo sin cerrar, por la que se
-           veía la pared del fondo. Se les añade el punto que falta —a la
-           misma x, porque ese tramo ya es recto— para que empalmen con el
-           palco frontal. El suelo no lo necesitaba: banda() lo cose desde
-           el contorno completo, que sí pasa por ahí. */
-        bordeAnillo=[{x:bordeAnillo[0].x,z:Z_CORREDOR_INI}].concat(
-          bordeAnillo,[{x:bordeAnillo[bordeAnillo.length-1].x,z:Z_CORREDOR_INI}]);
+        /* El primer vértice muestreado cae después de la junta. Copiar su
+           X al punto añadido dejaba un salto de unos 40 cm: la curva ya
+           había avanzado cuando nacían la valla y el entresuelo. Ambos
+           contornos empiezan ahora en las aristas exactas del palco. */
+        var xInteriorPrincipal=limPrincipal.xFrente+DESPLAZAMIENTO_FRONTAL_X;
+        var xExteriorPrincipal=limPrincipal.xFondo+DESPLAZAMIENTO_FRONTAL_X;
+        bordeAnillo=[{x:xInteriorPrincipal,z:Z_CORREDOR_INI}].concat(
+          bordeAnillo,[{x:-xInteriorPrincipal,z:Z_CORREDOR_INI}]);
+        planAnillo=[{x:xExteriorPrincipal,z:Z_CORREDOR_INI}].concat(
+          planAnillo,[{x:-xExteriorPrincipal,z:Z_CORREDOR_INI}]);
       }
 
       if(n===1){
@@ -2965,11 +3333,11 @@ function construir(escena){
 
            Intradós y trasdós siguen dando la vuelta completa: recortarlos
            dejaba cuñas sin suelo entre el palco y el arranque del anillo. */
-        entresuelo.add(banda(borde,geo.PLAN,yBajo,yBajo,MAT.techoPalco));
+        entresuelo.add(banda(borde,planPiso,yBajo,yBajo,MAT.techoPalco));
         // Solo el canto orientado al patio recibe el paño moldurado;
         // trasdós y testeros conservan su material independiente.
         entresuelo.add(cinta(bordeAnillo,yBajo,piso.y,MAT.entresueloFrente));
-        entresuelo.add(cinta(geo.PLAN,yBajo,piso.y,MAT.yeso));
+        entresuelo.add(cinta(planPiso,yBajo,piso.y,MAT.yeso));
         entresuelo.add(cinta([bordeAnillo[0],planAnillo[0]],yBajo,piso.y,MAT.yeso));
         entresuelo.add(cinta([bordeAnillo[bordeAnillo.length-1],planAnillo[planAnillo.length-1]],yBajo,piso.y,MAT.yeso));
         escena.add(entresuelo);
@@ -2980,14 +3348,33 @@ function construir(escena){
            misma cota; 5 mm de separación evitan que las dos tapas peleen
            por el mismo plano, igual que en el cruce del pasillo EXIT. */
         palcosFrontales(escena, piso.y+0.005, ALTURA_BARANDILLA, piso.alto, sillaPalcoGeo,
-          yBajo-0.005);
+          yBajo-0.005, 1);
+      }
+      if(n===NIVEL_ANFI){
+        var entresueloSegundo=new THREE.Group();
+        entresueloSegundo.name='entresueloDecorativoSegundo';
+        entresueloSegundo.add(banda(borde,planPiso,COTA_BAJO_SEGUNDO,COTA_BAJO_SEGUNDO,MAT.techoPalco));
+        entresueloSegundo.add(cinta(bordeAnillo,COTA_BAJO_SEGUNDO,piso.y,MAT.entresueloFrente));
+        entresueloSegundo.add(cinta(planPiso,COTA_BAJO_SEGUNDO,piso.y,MAT.yeso));
+        [0,borde.length-1].forEach(function(i){
+          entresueloSegundo.add(cinta([borde[i],planPiso[i]],COTA_BAJO_SEGUNDO,piso.y,MAT.yeso));
+        });
+        escena.add(entresueloSegundo);
+        // Apliques del mismo modelo que el nivel inferior, repartidos
+        // por toda la curva, incluido el frente del anfiteatro posterior.
+        var largoEntresuelo=0;
+        for(var i=1;i<bordeAnillo.length;i++)largoEntresuelo+=Math.hypot(
+          bordeAnillo[i].x-bordeAnillo[i-1].x,bordeAnillo[i].z-bordeAnillo[i-1].z);
+        var frenteLuces=remuestreaLinea(bordeAnillo,128),fondoLuces=remuestreaLinea(planPiso,128);
+        apliquesEntresuelo(escena,frenteLuces,fondoLuces,0,127,
+          Math.max(1,Math.round(largoEntresuelo/2.5)),piso.y-P.entresueloSegundo/2);
       }
       /* Todos los niveles llevan la misma valla calada. El segundo y el
          paraíso tenían en su lugar un antepecho macizo de granate rematado
          por una moldura de oro: vistos desde el patio se leían como dos
          grandes cintas rojas que tapaban la barandilla en vez de
          dibujarla, y encima eran los únicos sin celosía de la sala. */
-      barandillaPalco(escena, n===1?bordeAnillo:borde, yPiso, ALTURA_BARANDILLA);
+      barandillaPalco(escena, (n===1||n===NIVEL_ANFI)?bordeAnillo:borde, yPiso, ALTURA_BARANDILLA);
       /* Ningún nivel lleva ya la antigua tapa horizontal del palco. Iba a
          yTop —suelo + `alto`—, que tenía sentido mientras el antepecho
          macizo llegaba hasta ahí; con la celosía de 0,713 se quedaba
@@ -3006,19 +3393,19 @@ function construir(escena){
         }
         var limiteAutoridadI=geo.PLAN.length-1-limiteAutoridadD;
         [[iFrontalD,limiteAutoridadD],[limiteAutoridadI,iFrontalI]].forEach(function(limites){
-          var reparto=repartoUniformePlatea(geo.PLAN,borde,limites[0],limites[1],piso.palcosLado);
+          var reparto=repartoUniformePlatea(planPiso,borde,limites[0],limites[1],piso.palcosLado);
           var plan=reparto.plan,frente=reparto.borde,fin=plan.length-1;
           apliquesEntresuelo(escena,frente,plan,0,fin,piso.palcosLado,piso.y-P.entresueloPrincipal/2);
           separadoresPalco(escena,frente,plan,0,fin,piso.palcosLado,piso.y,piso.alto);
           sillasPalco(escena,frente,plan,0,fin,piso.palcosLado,yPiso,sillaPalcoGeo);
-          portadasPalcosPlatea(escena,frente,plan,0,fin,piso.palcosLado,yPiso,P.pisos[2].y);
-          antepalcosPlatea(escena,plan,0,fin,piso.palcosLado,yPiso,P.pisos[2].y,1);
+          portadasPalcosPlatea(escena,frente,plan,0,fin,piso.palcosLado,yPiso,COTA_BAJO_SEGUNDO);
+          antepalcosPlatea(escena,plan,0,fin,piso.palcosLado,yPiso,COTA_BAJO_SEGUNDO,1);
         });
         palcoAutoridades(escena,sillaPalcoGeo,piso.y);
         // Segundo nivel transitable: antepalcos laterales con puertas y
         // corredor continuo, a la cota superior del entresuelo.
         pasilloCurvoPalcos(escena,geo.PLAN,0,geo.PLAN.length-1,
-          yPiso,P.pisos[2].y,1);
+          yPiso,COTA_BAJO_SEGUNDO,1);
       }else if(n===NIVEL_ANFI){
         /* Segundo piso: seis palcos por ala en el arco delantero, el más
            cercano al escenario. El arco trasero no lleva palcos —es del
@@ -3037,20 +3424,28 @@ function construir(escena){
            que sus índices ya no son los de geo.PLAN, que es lo que usan el
            corredor y los antepalcos. */
         var largoPalcos=PALCOS_ANFI*FRENTE_PALCO_ANFI;
-        var iFinPalcos=indiceTrasArco(borde,0,largoPalcos);
+        // Los seis palcos empiezan a contarse pasado el palco frontal,
+        // no en la embocadura: antes se repartían sobre un tramo que
+        // ahora ocupa aquél.
+        var iFinPalcos=indiceTrasArco(borde,iFrontalBorde,largoPalcos);
         var iFinPalcosI=borde.length-1-iFinPalcos;
-        var iPlanFin=indiceTrasArco(geo.dentro(geo.PLAN,piso.dentro),0,largoPalcos);
+        var iPlanFin=indiceTrasArco(geo.dentro(geo.PLAN,piso.dentro),iFrontalPlan,largoPalcos);
         var iPlanFinI=geo.PLAN.length-1-iPlanFin;
         var yTechoAnfi=piso.y+2.75;
-        [[0,iFinPalcos],[iFinPalcosI,borde.length-1]].forEach(function(t){
+        [[iFrontalBorde,iFinPalcos],[iFinPalcosI,iFrontalBordeI]].forEach(function(t){
           separadoresPalco(escena,borde,planPiso,t[0],t[1],PALCOS_ANFI,piso.y,piso.alto);
           sillasPalco(escena,borde,planPiso,t[0],t[1],PALCOS_ANFI,yPiso,sillaPalcoGeo);
           portadasPalcosPlatea(escena,borde,planPiso,t[0],t[1],PALCOS_ANFI,yPiso,yTechoAnfi);
         });
-        [[0,iPlanFin],[iPlanFinI,geo.PLAN.length-1]].forEach(function(t){
+        [[iFrontalPlan,iPlanFin],[iPlanFinI,iFrontalPlanI]].forEach(function(t){
           antepalcosPlatea(escena,geo.PLAN,t[0],t[1],PALCOS_ANFI,yPiso,yTechoAnfi,NIVEL_ANFI);
           pasilloCurvoPalcos(escena,geo.PLAN,t[0],t[1],yPiso,yTechoAnfi,NIVEL_ANFI);
         });
+        /* Tercer y último palco frontal, apilado sobre el del principal
+           en la misma columna. Cuelga del intradós de su propia losa:
+           el canto coincide con el nuevo entresuelo decorativo. */
+        palcosFrontales(escena, piso.y+0.005, ALTURA_BARANDILLA, piso.alto, sillaPalcoGeo,
+          COTA_BAJO_SEGUNDO-0.005, NIVEL_ANFI);
       }else if(n===P.pisos.length-1){
         // El último módulo desembarca en un corredor continuo al paraíso.
         escena.add(banda(planPiso,geo.dentro(planPiso,-2.0),yPiso,yPiso,MAT.sueloPasillo));
@@ -3089,12 +3484,12 @@ function construir(escena){
   registrar(techo.material);
   escena.add(techo);
 
-  var lam=lampara(); lam.position.set(0,10.4,13.5); escena.add(lam);
+  var lam=lampara(); lam.position.set(0,alturaLampara(),13.5); escena.add(lam);
 
   // Luz: cálida, poca, como en sala antes de empezar.
   escena.add(new THREE.AmbientLight(0xffddb8, 0.42));
   escena.add(new THREE.HemisphereLight(0xffe0b0, 0x1a0c0e, 0.45));
-  var araña=new THREE.PointLight(0xffcf8a, 0.95, 40); araña.position.set(0,10.2,13.5); escena.add(araña);
+  var araña=new THREE.PointLight(0xffcf8a, 0.95, 40); araña.position.set(0,alturaLampara()-0.2,13.5); escena.add(araña);
   var focoIzq=new THREE.PointLight(0xffb88a, 0.35, 26); focoIzq.position.set(-7,6,9); escena.add(focoIzq);
   var focoDer=new THREE.PointLight(0xffb88a, 0.35, 26); focoDer.position.set(7,6,9); escena.add(focoDer);
   var candilejas=new THREE.PointLight(0xfff0d0, 1.1, 30); candilejas.position.set(0,4.5,-3); escena.add(candilejas);

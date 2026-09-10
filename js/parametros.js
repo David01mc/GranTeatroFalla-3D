@@ -19,8 +19,19 @@ var P = {
   tmax: 120*Math.PI/180,
   rake: 0.030,       // pendiente del patio (3 cm por metro, aprox. 1.7 grados)
   zRake: 2.0,
-  altura: 13.4,      // hasta el techo de Abárzuza
+  /* Techo de la sala. Se subió de 13,40 a 16,90 para descubrir el mural
+     frontal y después se ha rebajado 2 m, hasta 14,90. El marco de la
+     embocadura no se mueve con él —su coronación sigue a 12,65—, de modo
+     que sobre el centro quedan 2,25 m de pared pintada en vez de 4,25.
+     La pintura sigue anclada arriba: sus figuras rozan el borde superior
+     de la imagen y cualquier otro anclaje las decapitaría. */
+  altura: 14.9,
+  muralEscenario:{aspecto:1983/793}, // Proporción del albedo, sin estirar las figuras.
+  marcoEscenario:{clave:10.45,anchoColumna:1.25,escalones:[0.20,0.20,0.20,0.20,0.40],
+    avanceEscalon:0.30,altoFranja:0.70,avanceFranja:0.90,altoRemate:0.15,
+    tramoCurvo:0.42,zInicio:-0.65}, // Las cotas del marco son independientes del techo.
   anchoPasilloPalcos: 3.90, // corredor posterior (antes 3.00 m; +30 %)
+  entresueloSegundo: 0.25,   // Canto decorativo bajo el suelo del segundo piso.
   entresueloPrincipal: 0.25, // espesor decorativo entre 4.10 y 4.35 m
   pisos: [           // y del piso, y del antepecho, retranqueo, nº de palcos
     {y:0.00, alto:1.15, dentro:2.90, palcos:0, palcosLado:8, nombre:'platea'},
@@ -31,7 +42,7 @@ var P = {
        tiene justo debajo— porque los 25 cm del entresuelo decorativo
        salieron de ese hueco al subir su suelo de 4,10 a 4,35. Ahora las
        alturas libres quedan 2,88 (platea) · 2,75 (principal) · 2,80
-       (segundo) · 3,50 (paraíso), todas dentro de los 13,40 de la sala.
+       (segundo) · 5,00 (paraíso), todas dentro de los 14,90 de la sala.
 
        Los arcos de las portadas del principal cuelgan de esta misma cota
        (ver portadasPalcosPlatea, que recibe P.pisos[2].y como techo), de
